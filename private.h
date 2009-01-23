@@ -48,9 +48,12 @@ extern void hsv2rgb(double *hsv, double *rgb);
 
 
 #ifdef WIN32
-#define M_PI   3.1415926536
-#define M_1_PI 0.3183098862
-#define M_PI_4 0.7853981634
+
+#ifndef M_PI
+   #define M_PI   3.1415926536
+   #define M_1_PI 0.3183098862
+   #define M_PI_4 0.7853981634
+#endif
 #define random()  (rand() ^ (rand()<<15))
 #define srandom(x)  (srand(x))
 extern int getpid();
