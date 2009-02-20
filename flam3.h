@@ -72,6 +72,9 @@ extern char *flam3_variation_names[];
 
 #define flam3_max_action_length 10000
 
+#define flam3_palette_mode_step   0
+#define flam3_palette_mode_linear 1
+
 #define VAR_LINEAR   0
 #define VAR_SINUSOIDAL  1
 #define VAR_SPHERICAL  2
@@ -482,6 +485,8 @@ typedef struct {
 
    int temporal_filter_type; /* Temporal filters */
    double temporal_filter_width, temporal_filter_exp;
+   
+   int palette_mode;
 
 
 } flam3_genome;

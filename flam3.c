@@ -189,7 +189,6 @@ static void interp_and_convert_back(double *c, int ncps, int xfi, double cxang[4
 void prepare_xform_fn_ptrs(flam3_genome *, randctx *);
 static void initialize_xforms(flam3_genome *thiscp, int start_here);
 static int parse_flame_element(xmlNode *);
-//static void parse_image_element(xmlNode *);
 static int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *rc);
 static double adjust_percentage(double in);
 
@@ -2906,6 +2905,7 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
    result->symmetry = 0;
    result->spatial_filter_select = cpi[0].spatial_filter_select;
    result->temporal_filter_type = cpi[0].temporal_filter_type;
+   result->palette_mode = cpi[0].palette_mode;
 
    result->interpolation_type = cpi[0].interpolation_type;
    INTERP(brightness);
@@ -4344,6 +4344,7 @@ void clear_cp(flam3_genome *cp, int default_flag) {
        cp->temporal_filter_type = flam3_temporal_box;
        cp->temporal_filter_width = 1.0;
        cp->temporal_filter_exp = 0.0;
+       cp->palette_mode = flam3_palette_mode_step;
 
     } else {
        /* Defaults are off, so set to UN-reasonable values. */
@@ -4371,6 +4372,7 @@ void clear_cp(flam3_genome *cp, int default_flag) {
        cp->temporal_filter_type = -1;
        cp->temporal_filter_width = -1;
        cp->temporal_filter_exp = -999;
+       cp->palette_mode = -1;
     }
 
     if (cp->xform != NULL && cp->num_xforms > 0) {
@@ -4693,6 +4695,13 @@ static int parse_flame_element(xmlNode *flame_node) {
          cp->temporal_filter_width = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"temporal_filter_exp")) {
          cp->temporal_filter_exp = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"palette_mode")) {
+         if (!strcmp("step", att_str))
+            cp->palette_mode = flam3_palette_mode_step;
+         else if (!strcmp("linear", att_str))
+            cp->palette_mode = flam3_palette_mode_linear;
+         else
+            fprintf(stderr,"warning: unrecognized palette mode %s.  Using step.\n",att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"quality")) {
          cp->sample_density = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"passes")) {
@@ -5787,6 +5796,8 @@ void flam3_apply_template(flam3_genome *cp, flam3_genome *templ) {
       cp->temporal_filter_exp = templ->temporal_filter_exp;
    if (templ->highlight_power >=0)
       cp->highlight_power = templ->highlight_power;
+   if (templ->palette_mode >= 0)
+      cp->palette_mode = templ->palette_mode;
 
 }
 
@@ -5882,6 +5893,11 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
    fprintf(f, " estimator_radius=\"%g\" estimator_minimum=\"%g\" estimator_curve=\"%g\"",
       cp->estimator, cp->estimator_minimum, cp->estimator_curve);
    fprintf(f, " gamma_threshold=\"%g\"", cp->gam_lin_thresh);
+   
+   if (flam3_palette_mode_step == cp->palette_mode)
+      fprintf(f, " palette_mode=\"step\"");
+   else if (flam3_palette_mode_linear == cp->palette_mode)
+      fprintf(f, " palette_mode=\"linear\"");
 
    if (flam3_interpolation_linear != cp->interpolation)
        fprintf(f, " interpolation=\"smooth\"");

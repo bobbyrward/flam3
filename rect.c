@@ -151,7 +151,9 @@ static void iter_thread(void *fth) {
       /* Put them in the bucket accumulator */
       for (j = 0; j < sub_batch_size*4; j+=4) {
          double p0, p1, p00, p11;
-         int k, color_index0, color_index1;
+         double dbl_index0,dbl_frac;
+         double interpcolor[4];
+         int k, ci, color_index0, color_index1;
          double *p = &(fthp->iter_storage[j]);
          bucket *b;
 
@@ -176,6 +178,9 @@ static void iter_thread(void *fth) {
             else
                logvis = pow(1.0/exp(10-10*p[3]),.6);
             
+            b = buckets + (int)(ficp->ws0 * p0 - ficp->wb0s0) +
+                ficp->width * (int)(ficp->hs1 * p1 - ficp->hb1s1);
+
 #ifdef USE_FLOAT_INDICES
             color_index0 = 0;
             
@@ -190,15 +195,6 @@ static void iter_thread(void *fth) {
             }
             
             //fprintf(stderr,"p[2],ci0 = %f, %d\n",p[2],color_index0);
-#else
-            color_index0 = (int) (p[2] * CMAP_SIZE);
-            if (color_index0 < 0)
-               color_index0 = 0;
-            else if (color_index0 > CMAP_SIZE_M1)
-               color_index0 = CMAP_SIZE_M1;
-#endif
-            b = buckets + (int)(ficp->ws0 * p0 - ficp->wb0s0) +
-                ficp->width * (int)(ficp->hs1 * p1 - ficp->hb1s1);
 
             if (p[3]==1.0) {
                bump_no_overflow(b[0][0], ficp->dmap[color_index0].color[0]);
@@ -211,6 +207,51 @@ static void iter_thread(void *fth) {
                bump_no_overflow(b[0][2], logvis*ficp->dmap[color_index0].color[2]);
                bump_no_overflow(b[0][3], logvis*ficp->dmap[color_index0].color[3]);
             }
+#else
+            dbl_index0 = p[2] * CMAP_SIZE;
+            color_index0 = (int) (dbl_index0);
+            
+            if (flam3_palette_mode_linear == fthp->cp.palette_mode) {
+               if (color_index0 < 0) {
+                  color_index0 = 0;
+                  dbl_frac = 0;
+               } else if (color_index0 >= CMAP_SIZE_M1) {
+                  color_index0 = CMAP_SIZE_M1-1;
+                  dbl_frac = 1.0;
+               } else {
+                  /* interpolate between color_index0 and color_index0+1 */
+                  dbl_frac = dbl_index0 - (double)color_index0;
+               }
+                        
+               for (ci=0;ci<4;ci++) {
+                  interpcolor[ci] = ficp->dmap[color_index0].color[ci] * (1.0-dbl_frac) + 
+                                    ficp->dmap[color_index0+1].color[ci] * dbl_frac;               
+               }
+               
+            } else { /* Palette mode step */
+            
+               if (color_index0 < 0) {
+                  color_index0 = 0;
+               } else if (color_index0 >= CMAP_SIZE_M1) {
+                  color_index0 = CMAP_SIZE_M1;
+               }
+                        
+               for (ci=0;ci<4;ci++)
+                  interpcolor[ci] = ficp->dmap[color_index0].color[ci];               
+            }
+
+            if (p[3]==1.0) {
+               bump_no_overflow(b[0][0], interpcolor[0]);
+               bump_no_overflow(b[0][1], interpcolor[1]);
+               bump_no_overflow(b[0][2], interpcolor[2]);
+               bump_no_overflow(b[0][3], interpcolor[3]);
+            } else {
+               bump_no_overflow(b[0][0], logvis*interpcolor[0]);
+               bump_no_overflow(b[0][1], logvis*interpcolor[1]);
+               bump_no_overflow(b[0][2], logvis*interpcolor[2]);
+               bump_no_overflow(b[0][3], logvis*interpcolor[3]);
+            }
+#endif
 
          }
       }
