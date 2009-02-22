@@ -970,6 +970,12 @@ static void var41_arch(void *helper, double weight)
      FPy := FPy + sqr(sinr)/cosr*vars[29];
    end;
    */
+   
+   /*
+    * !!! Note !!!
+    * This code uses the variation weight in a non-standard fashion, and
+    * it may change or even be removed in future versions of flam3.
+    */
 
    flam3_iter_helper *f = (flam3_iter_helper *) helper;
 
@@ -1031,6 +1037,12 @@ static void var44_rays(void *helper, double weight)
    end;
    */
 
+   /*
+    * !!! Note !!!
+    * This code uses the variation weight in a non-standard fashion, and
+    * it may change or even be removed in future versions of flam3.
+    */
+
    flam3_iter_helper *f = (flam3_iter_helper *) helper;
 
    double ang = weight * flam3_random_isaac_01(f->rc) * M_PI;
@@ -1057,6 +1069,12 @@ static void var45_blade(void *helper, double weight)
    end;
    */
 
+   /*
+    * !!! Note !!!
+    * This code uses the variation weight in a non-standard fashion, and
+    * it may change or even be removed in future versions of flam3.
+    */
+
    flam3_iter_helper *f = (flam3_iter_helper *) helper;
 
    double r = flam3_random_isaac_01(f->rc) * weight * f->precalc_sqrt;
@@ -1072,6 +1090,12 @@ static void var45_blade(void *helper, double weight)
 static void var46_secant2(void *helper, double weight)
 {
    /* Intended as a 'fixed' version of secant */
+
+   /*
+    * !!! Note !!!
+    * This code uses the variation weight in a non-standard fashion, and
+    * it may change or even be removed in future versions of flam3.
+    */
 
    flam3_iter_helper *f = (flam3_iter_helper *) helper;
 
@@ -1102,6 +1126,12 @@ static void var47_twintrian(void *helper, double weight)
    end;
    */
 
+   /*
+    * !!! Note !!!
+    * This code uses the variation weight in a non-standard fashion, and
+    * it may change or even be removed in future versions of flam3.
+    */
+
    flam3_iter_helper *f = (flam3_iter_helper *) helper;
 
    double r = flam3_random_isaac_01(f->rc) * weight * f->precalc_sqrt;
@@ -1109,6 +1139,9 @@ static void var47_twintrian(void *helper, double weight)
    
    sincos(r,&sinr,&cosr);
    diff = log10(sinr*sinr)+cosr;
+   
+   if (badvalue(diff))
+      diff = -30.0;      
 
    f->p0 += weight * f->tx * diff;
    f->p1 += weight * f->tx * (diff - sinr*M_PI);
@@ -1558,6 +1591,13 @@ static void var65_lazysusan (void *helper, double weight) {
 static void var66_loonie (void *helper, double weight) {
 
    /* Loonie in the Apophysis Plugin Pack */
+
+   /*
+    * !!! Note !!!
+    * This code uses the variation weight in a non-standard fashion, and
+    * it may change or even be removed in future versions of flam3.
+    */
+
    flam3_iter_helper *f = (flam3_iter_helper *)helper;
    
    double r2 = f->precalc_sumsq;
@@ -1668,6 +1708,13 @@ static void var72_scry (void *helper, double weight) {
    /* note that scry does not multiply by weight, but as the */
    /* values still approach 0 as the weight approaches 0, it */
    /* should be ok                                           */ 
+
+   /*
+    * !!! Note !!!
+    * This code uses the variation weight in a non-standard fashion, and
+    * it may change or even be removed in future versions of flam3.
+    */
+
    flam3_iter_helper *f = (flam3_iter_helper *)helper;
    
    double t = f->precalc_sumsq;
@@ -1818,6 +1865,12 @@ static void var80_whorl (void *helper, double weight) {
    
    /* whorl from apo plugins pack */
    
+   /*
+    * !!! Note !!!
+    * This code uses the variation weight in a non-standard fashion, and
+    * it may change or even be removed in future versions of flam3.
+    */
+
    flam3_iter_helper *f = (flam3_iter_helper *)helper;
 
    double r = f->precalc_sqrt;
@@ -2442,6 +2495,10 @@ static int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *
          case (VAR_WAVES2):
                 var81_waves2(&f, cp->xform[fn].active_var_weights[var_n]); break;
       }
+//      if (badvalue(f.p0) || badvalue(f.p1)) {
+//         fprintf(stderr,"%d\n",cp->xform[fn].varFunc[var_n]);
+//         break;
+//      }
    }
    /* apply the post transform */
    if (!id_matrix(cp->xform[fn].post)) {
