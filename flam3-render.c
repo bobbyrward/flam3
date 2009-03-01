@@ -223,6 +223,10 @@ int main(int argc, char **argv) {
       cps[i].height = (int)(cps[i].height * ss);
       cps[i].width = (int)(cps[i].width * ss);
       cps[i].pixels_per_unit *= ss;
+      if (cps[i].height<=0 || cps[i].width<=0) {
+         fprintf(stderr,"output image has dimension <=0, aborting.\n");
+         exit(1);
+      }
    }
 
    if (out && (ncps > 1)) {
