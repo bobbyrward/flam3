@@ -169,14 +169,21 @@ static void iter_thread(void *fth) {
 
          if (p0 >= ficp->bounds[0] && p1 >= ficp->bounds[1] && p0 <= ficp->bounds[2] && p1 <= ficp->bounds[3]) {
 
-            double logvis;
+            double logvis=1.0;
             bucket *buckets = (bucket *)(ficp->buckets);
 
             /* Skip if invisible */
             if (p[3]==0)
                continue;
-            else
-               logvis = pow(1.0/exp(10-10*p[3]),.6);
+            //else {
+               /* There's two ways to do this...one is to threshold in the iter loop and plot */
+               /* everything that gets through, and the other is to scale all of the values   */
+               /* based on the visibility factor.  This code does the latter; the former is   */
+               /* in flam3.c */
+               
+               /* We're set to do the former in flam3.c, so skip this calculation */
+               //logvis = adjust_percentage(p[3]);
+            //}
             
             b = buckets + (int)(ficp->ws0 * p0 - ficp->wb0s0) +
                 ficp->width * (int)(ficp->hs1 * p1 - ficp->hb1s1);
@@ -542,7 +549,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
       double de_time;
       double sample_density=0.0;
       int de_row_size, de_kernel_index=0, de_half_size;
-      int de_cutoff_val=0;
+      int de_cutoff_val=0, de_count_limit;
       double *de_filter_coefs=NULL,*de_filter_widths=NULL;
       double num_de_filters_d;
       int num_de_filters=0,filtloop,de_max_ind;
@@ -599,10 +606,13 @@ static void render_rectangle(flam3_frame *spec, void *out,
          num_de_filters = ceil(num_de_filters_d);
          
          /* Condense the smaller kernels to save space */
-         if (num_de_filters>keep_thresh) 
-	   de_max_ind = ceil(keep_thresh + pow(num_de_filters-keep_thresh,cp.estimator_curve))+1;
-         else
+         if (num_de_filters>keep_thresh) { 
+            de_max_ind = ceil(keep_thresh + pow(num_de_filters-keep_thresh,cp.estimator_curve))+1;
+            de_count_limit = pow( (double)(de_max_ind-100), 1.0/cp.estimator_curve) + 100;
+         } else {
             de_max_ind = num_de_filters;
+            de_count_limit = de_max_ind;
+         }
 
          /* Allocate the memory for these filters */
          /* and the hit/width lookup vector       */
@@ -644,8 +654,8 @@ static void render_rectangle(flam3_frame *spec, void *out,
                   if (de_filt_d <= 1.0) {
 if (1) {
                      /* Gaussian */
-                     de_filt_sum += flam3_spatial_filter(flam3_gaussian_kernel,
-                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d);
+                     de_filt_sum += /*adjust_percentage*/(flam3_spatial_filter(flam3_gaussian_kernel,
+                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d));
                      //de_filt_sum += flam3_gaussian_filter(flam3_gaussian_support*de_filt_d);
 } else {
                      /* Epanichnikov */
@@ -668,14 +678,15 @@ if (1) {
 if (1) {
                      /* Gaussian */
                      de_filter_coefs[filter_coef_idx] =
-                         flam3_spatial_filter(flam3_gaussian_kernel,
-                            flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d)/de_filt_sum; 
+                         /*adjust_percentage*/(flam3_spatial_filter(flam3_gaussian_kernel,
+                            flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d))/de_filt_sum; 
                          //flam3_gaussian_filter(flam3_gaussian_support*de_filt_d)/de_filt_sum;
 } else {
                      /* Epanichnikov */
                      de_filter_coefs[filter_coef_idx] = (1.0 - (de_filt_d * de_filt_d))/de_filt_sum;
 }
                   }
+//                  de_filter_coefs[filter_coef_idx] = adjust_percentage(de_filter_coefs[filter_coef_idx]);
                   
                   filter_coef_idx ++;
                }
@@ -954,11 +965,13 @@ if (1) {
                if (scf)
                   f_select *= scfact;
                   
-               if (f_select<=keep_thresh)
+               if (f_select > de_count_limit)
+                  f_select_int = de_cutoff_val;                  
+               else if (f_select<=keep_thresh)
                   f_select_int = (int)ceil(f_select)-1;
                else
-		 f_select_int = (int)keep_thresh +
-		   (int)floor(pow(f_select-keep_thresh,cp.estimator_curve));
+                  f_select_int = (int)keep_thresh +
+                     (int)floor(pow(f_select-keep_thresh,cp.estimator_curve));
 
                /* If the filter selected below the min specified clamp it to the min */
                if (f_select_int >= de_cutoff_val)
