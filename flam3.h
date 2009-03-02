@@ -204,7 +204,8 @@ typedef struct {
    double post[3][2];   /* the post transform */
    double density;      /* probability that this function is chosen. 0 - 1 */
    double color;     /* color coords for this function. 0 - 1 */
-   double symmetry;     /* 1=this is a symmetry xform, 0=not */
+   double color_speed;  /* scaling factor on color added to current iteration */
+   double animate;      /* whether or not this xform rotates (in sheep) >0 means stationary */
    double visibility;   /* 0=invisible, 1=totally visible */
    double vis_adjusted; /* adjusted visibility for better transitions */
    

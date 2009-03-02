@@ -2282,7 +2282,7 @@ static int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *
 
    f.rc = rc;
 
-   s = cp->xform[fn].symmetry;
+   s = cp->xform[fn].color_speed;
    s1 = 0.5 - 0.5 * s;
 
    next_color = (p[2] + cp->xform[fn].color) * s1 + s * p[2];
@@ -2745,15 +2745,8 @@ void flam3_rotate(flam3_genome *cp, double by, int interpolation_type) {
       double U[2][2];
       double dtheta = by * 2.0 * M_PI / 360.0;
 
-      /* Don't rotate symmetric xforms unless necessary */
-      /* 1 means that all rotating xform[i]'s have symmetry>0 */
-      /* or that it's OK to check */
-
-//      if (symm[i]==1) {
-//         if (cp->xform[i].symmetry > 0.0) continue;
-//      }
-
-      if (cp->xform[i].symmetry > 0.0)
+      /* Don't rotate xforms with > 0 animate values */
+      if (cp->xform[i].animate > 0.0)
          continue;
 
       if (cp->xform[i].padding == 1) {
@@ -3016,7 +3009,8 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
       if (result->xform[i].color>1) result->xform[i].color=1;
       
       INTERP(xform[i].visibility);      
-      INTERP(xform[i].symmetry);
+      INTERP(xform[i].color_speed);
+      INTERP(xform[i].animate);
       INTERP(xform[i].blob_low);
       INTERP(xform[i].blob_high);
       INTERP(xform[i].blob_waves);
@@ -3233,8 +3227,8 @@ void establish_asymmetric_refangles(flam3_genome *cp, int ncps) {
                //padsymflag = (cp[k-1].interpolation_type==flam3_inttype_log);
                padsymflag = 0;
           
-               sym0 = (cp[k-1].xform[xfi].symmetry>0 || (cp[k-1].xform[xfi].padding==1 && padsymflag));
-               sym1 = (cp[k].xform[xfi].symmetry>0 || (cp[k].xform[xfi].padding==1 && padsymflag));
+               sym0 = (cp[k-1].xform[xfi].animate>0 || (cp[k-1].xform[xfi].padding==1 && padsymflag));
+               sym1 = (cp[k].xform[xfi].animate>0 || (cp[k].xform[xfi].padding==1 && padsymflag));
 
                if ( sym1 && !sym0 )
                   cp[k].xform[xfi].wind[col] = cxang[k-1][col] + 2*M_PI;
@@ -3756,9 +3750,9 @@ static int compare_xforms(const void *av, const void *bv) {
    ad = det_matrix(aa);
    bd = det_matrix(bb);
 
-   if (a->symmetry < b->symmetry) return 1;
-   if (a->symmetry > b->symmetry) return -1;
-   if (a->symmetry) {
+   if (a->color_speed < b->color_speed) return 1;
+   if (a->color_speed > b->color_speed) return -1;
+   if (a->color_speed) {
       if (ad < 0) return -1;
       if (bd < 0) return 1;
       ad = atan2(a->c[0][0], a->c[0][1]);
@@ -3778,7 +3772,8 @@ static void initialize_xforms(flam3_genome *thiscp, int start_here) {
    for (i = start_here ; i < thiscp->num_xforms ; i++) {
        thiscp->xform[i].padding = 0;
        thiscp->xform[i].density = 0.0;
-       thiscp->xform[i].symmetry = 0;
+       thiscp->xform[i].color_speed = 0.0;
+       thiscp->xform[i].animate = 0.0;
        thiscp->xform[i].color = i&1;
        thiscp->xform[i].visibility = 1.0;
        thiscp->xform[i].var[0] = 1.0;
@@ -4294,8 +4289,9 @@ void flam3_copyx(flam3_genome *dest, flam3_genome *src, int dest_std_xforms, int
       if (src->final_xform_enable > 0) {
          dest->xform[dest->num_xforms-1] = src->xform[src->final_xform_index];
       } else {
-         /* Interpolated-against final xforms need symmetry set */
-         dest->xform[dest->num_xforms-1].symmetry=1.0;
+         /* Interpolated-against final xforms need animate & color_speed set to 1.0 */
+         dest->xform[dest->num_xforms-1].animate=1.0;
+         dest->xform[dest->num_xforms-1].color_speed=1.0;
       }
 
    } else {
@@ -5061,7 +5057,13 @@ static int parse_flame_element(xmlNode *flame_node) {
             } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"enabled")) {
                cp->final_xform_enable = flam3_atoi(att_str);
             } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"symmetry")) {
-               cp->xform[xf].symmetry = flam3_atof(att_str);
+               /* Deprecated.  Set both color_speed and animate to this value. */
+               cp->xform[xf].color_speed = flam3_atof(att_str);
+               cp->xform[xf].animate = flam3_atof(att_str);
+            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"color_speed")) {
+               cp->xform[xf].color_speed = flam3_atof(att_str);
+            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"animate")) {
+               cp->xform[xf].animate = flam3_atof(att_str);
             } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"color")) {
                double tmpc1;
                cp->xform[xf].color = 0.0;
@@ -5996,7 +5998,7 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
       int modulus_var=0,oscope_var=0,popcorn2_var=0,separation_var=0;
       int split_var=0,splits_var=0,stripes_var=0,wedge_var=0,wedgeJ_var=0;
       int wedgeS_var=0,whorl_var=0,waves2_var=0;
-      if ( !(cp->symmetry &&  cp->xform[i].symmetry == 1.0)) {
+      if ( !(cp->symmetry &&  cp->xform[i].color_speed == 1.0 && cp->xform[i].animate == 1.0)) {
 
          if (i==cp->final_xform_index )
             fprintf(f, "   <finalxform color=\"%g\" ", cp->xform[i].color);
@@ -6005,7 +6007,8 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
             fprintf(f, "   <xform weight=\"%g\" color=\"%g\" ", cp->xform[i].density, cp->xform[i].color);
          }
          
-         fprintf(f, "symmetry=\"%g\" ", cp->xform[i].symmetry);
+         fprintf(f, "color_speed=\"%g\" animate=\"%g\" ", cp->xform[i].color_speed, cp->xform[i].animate);
+//         fprintf(f, "symmetry=\"%g\" ", cp->xform[i].symmetry);
 
          for (j = 0; j < flam3_nvariations; j++) {
             double v = cp->xform[i].var[j];
@@ -6527,7 +6530,8 @@ void flam3_add_symmetry(flam3_genome *cp, int sym) {
       flam3_add_xforms(cp,1,0,0);
 
       cp->xform[i].density = 1.0;
-      cp->xform[i].symmetry = 1.0;
+      cp->xform[i].color_speed = 1.0;
+      cp->xform[i].animate = 1.0;
       cp->xform[i].var[0] = 1.0;
       for (j = 1; j < flam3_nvariations; j++)
          cp->xform[i].var[j] = 0;
@@ -6551,8 +6555,9 @@ void flam3_add_symmetry(flam3_genome *cp, int sym) {
       flam3_add_xforms(cp, 1, 0,0);
 
       cp->xform[i].density = 1.0;
+      cp->xform[i].color_speed = 1.0;
+      cp->xform[i].animate = 1.0;
       cp->xform[i].var[0] = 1.0;
-      cp->xform[i].symmetry = 1.0;
       for (j = 1; j < flam3_nvariations; j++)
          cp->xform[i].var[j] = 0;
       cp->xform[i].color = (sym<3) ? 0.0 : ((k-1.0)/(sym-2.0));
@@ -6640,7 +6645,8 @@ void flam3_random(flam3_genome *cp, int *ivars, int ivars_n, int sym, int spec_x
       int j, k;
       cp->xform[i].density = 1.0 / nxforms;
       cp->xform[i].color = i&1;
-      cp->xform[i].symmetry = 0.0;
+      cp->xform[i].color_speed = 0.0;
+      cp->xform[i].animate = 0.0;
       for (j = 0; j < 3; j++) {
          for (k = 0; k < 2; k++) {
             cp->xform[i].c[j][k] = flam3_random11();
