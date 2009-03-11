@@ -189,6 +189,7 @@ static void interp_and_convert_back(double *c, int ncps, int xfi, double cxang[4
 void prepare_xform_fn_ptrs(flam3_genome *, randctx *);
 static void initialize_xforms(flam3_genome *thiscp, int start_here);
 static int parse_flame_element(xmlNode *);
+static int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_xaos, flam3_chaos_entry *xaos, int numstd, int motionxf);
 static int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *rc);
 static double adjust_percentage(double in);
 
@@ -3180,6 +3181,158 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
    }
 }
 
+#define APPMOT(x)  do { addto->x += mot[i].x * motion_funcs(func,freq*blend); } while (0);
+
+double motion_funcs(int funcnum, double timeval) {
+
+   /* motion funcs should be cyclic, and equal to 0 at integral time values */
+   if (funcnum==MOTION_SINE) {
+      return (sin(2.0*M_PI*timeval));
+   }
+   
+}
+
+void apply_motion_parameters(flam3_xform *xf, flam3_xform *addto, double blend) {
+
+   int i,j,k;
+   int freq;
+   int func;
+   flam3_xform* mot;
+   
+   mot = xf->motion;
+
+   /* Loop over the motion elements and add their contribution to the original vals */
+   for (i=0; i<xf->num_motion; i++) {   
+   
+      freq = mot->motion_freq;
+      func = mot->motion_func;
+      
+      APPMOT(density); /* Must ensure > 0 after all is applied */
+      APPMOT(color); /* Must ensure [0,1] after all is applied */
+      
+      APPMOT(visibility);      
+      APPMOT(color_speed);
+      APPMOT(animate);
+      APPMOT(blob_low);
+      APPMOT(blob_high);
+      APPMOT(blob_waves);
+      APPMOT(pdj_a);
+      APPMOT(pdj_b);
+      APPMOT(pdj_c);
+      APPMOT(pdj_d);
+      APPMOT(fan2_x);
+      APPMOT(fan2_y);
+      APPMOT(rings2_val);
+      APPMOT(perspective_angle);
+      APPMOT(perspective_dist);
+      APPMOT(juliaN_power);
+      APPMOT(juliaN_dist);
+      APPMOT(juliaScope_power);
+      APPMOT(juliaScope_dist);
+      APPMOT(radialBlur_angle);
+      APPMOT(pie_slices);
+      APPMOT(pie_rotation);
+      APPMOT(pie_thickness);
+      APPMOT(ngon_sides);
+      APPMOT(ngon_power);
+      APPMOT(ngon_circle);
+      APPMOT(ngon_corners);
+      APPMOT(curl_c1);
+      APPMOT(curl_c2);
+      APPMOT(rectangles_x);
+      APPMOT(rectangles_y);
+      APPMOT(amw_amp);
+      APPMOT(disc2_rot);
+      APPMOT(disc2_twist);
+      APPMOT(supershape_rnd);
+      APPMOT(supershape_m);
+      APPMOT(supershape_n1);
+      APPMOT(supershape_n2);
+      APPMOT(supershape_n3);
+      APPMOT(supershape_holes);
+      APPMOT(flower_petals);
+      APPMOT(flower_holes);
+      APPMOT(conic_eccen);
+      APPMOT(conic_holes);
+      APPMOT(parabola_height);
+      APPMOT(parabola_width);
+      APPMOT(bent2_x);
+      APPMOT(bent2_y);
+      APPMOT(bipolar_shift);
+      APPMOT(cell_size);
+      APPMOT(cpow_r);
+      APPMOT(cpow_i);
+      APPMOT(cpow_power);
+      APPMOT(curve_xamp);
+      APPMOT(curve_yamp);
+      APPMOT(curve_xlength);
+      APPMOT(curve_ylength);
+      APPMOT(escher_beta);
+      APPMOT(lazysusan_x);
+      APPMOT(lazysusan_y);
+      APPMOT(lazysusan_twist);
+      APPMOT(lazysusan_space);
+      APPMOT(lazysusan_spin);
+      APPMOT(modulus_x);
+      APPMOT(modulus_y);
+      APPMOT(oscope_separation);
+      APPMOT(oscope_frequency);
+      APPMOT(oscope_amplitude);
+      APPMOT(oscope_damping);
+      APPMOT(popcorn2_x);
+      APPMOT(popcorn2_y);
+      APPMOT(popcorn2_c);
+      APPMOT(separation_x);
+      APPMOT(separation_xinside);
+      APPMOT(separation_y);
+      APPMOT(separation_yinside);
+      APPMOT(split_xsize);
+      APPMOT(split_ysize);
+      APPMOT(splits_x);
+      APPMOT(splits_y);
+      APPMOT(stripes_space);
+      APPMOT(stripes_warp);
+      APPMOT(wedge_angle);
+      APPMOT(wedge_hole);
+      APPMOT(wedge_count);
+      APPMOT(wedge_swirl);
+      APPMOT(wedge_julia_angle);
+      APPMOT(wedge_julia_count);
+      APPMOT(wedge_julia_power);
+      APPMOT(wedge_julia_dist);
+      APPMOT(wedge_sph_angle);
+      APPMOT(wedge_sph_hole);
+      APPMOT(wedge_sph_count);
+      APPMOT(wedge_sph_swirl);
+      APPMOT(whorl_inside);
+      APPMOT(whorl_outside);
+      APPMOT(waves2_scalex);
+      APPMOT(waves2_scaley);
+      APPMOT(waves2_freqx);
+      APPMOT(waves2_freqy);
+
+      for (j = 0; j < flam3_nvariations; j++)
+         APPMOT(var[j]);
+         
+      for (j=0; j<3; j++) {
+         for (k=0; k<2; k++) {
+            APPMOT(c[j][k]);
+            APPMOT(post[j][k]);
+         }
+      }
+         
+   }
+   
+   /* Make sure certain params are within reasonable bounds */
+   if (addto->color<0) addto->color=0;
+   if (addto->color>1) addto->color=1;
+   if (addto->density<0) addto->density=0;
+   
+}
+      
+      
+   
+
 void establish_asymmetric_refangles(flam3_genome *cp, int ncps) {
 
    int k, xfi, col;
@@ -3777,6 +3930,10 @@ static void initialize_xforms(flam3_genome *thiscp, int start_here) {
        thiscp->xform[i].color = i&1;
        thiscp->xform[i].visibility = 1.0;
        thiscp->xform[i].var[0] = 1.0;
+       thiscp->xform[i].motion_freq = 0;
+       thiscp->xform[i].motion_func = 0;
+       thiscp->xform[i].num_motion = 0;
+       thiscp->xform[i].motion = NULL;
        for (j = 1; j < flam3_nvariations; j++)
           thiscp->xform[i].var[j] = 0.0;
        thiscp->xform[i].c[0][0] = 1.0;
@@ -4095,6 +4252,22 @@ void flam3_copy_params(flam3_xform *dest, flam3_xform *src, int varn) {
    }
 }
 
+/* Motion support functions */
+void flam3_add_motion_element(flam3_xform *xf) {
+
+   /* Add one to the xform's count of motion elements */
+   xf->num_motion++;
+   
+   /* Reallocate the motion storage to include the empty space */
+   xf->motion = (struct xform *)realloc(xf->motion, xf->num_motion * sizeof(struct xform));
+   
+   /* Initialize the motion element */
+   /* In this case, all elements should be set to 0 */
+   memset( &(xf->motion[xf->num_motion-1]), 0, sizeof(struct xform));
+   
+}   
+   
+
 /* Xform support functions */
 void flam3_add_xforms(flam3_genome *thiscp, int num_to_add, int interp_padding, int final_flag) {
 
@@ -4105,10 +4278,10 @@ void flam3_add_xforms(flam3_genome *thiscp, int num_to_add, int interp_padding, 
    
    oldstd = thiscp->num_xforms - (thiscp->final_xform_index >= 0);
 
-   if (thiscp->num_xforms > 0)
+//   if (thiscp->num_xforms > 0)
       thiscp->xform = (flam3_xform *)realloc(thiscp->xform, (thiscp->num_xforms + num_to_add) * sizeof(flam3_xform));
-   else
-      thiscp->xform = (flam3_xform *)malloc(num_to_add * sizeof(flam3_xform));
+//   else
+//      thiscp->xform = (flam3_xform *)malloc(num_to_add * sizeof(flam3_xform));
 
    thiscp->num_xforms += num_to_add;
 
@@ -4599,7 +4772,7 @@ static int var2n(const char *s) {
 
 static int parse_flame_element(xmlNode *flame_node) {
    flam3_genome *cp = &xml_current_cp;
-   xmlNode *chld_node;
+   xmlNode *chld_node, *motion_node;
    xmlNodePtr edit_node;
    xmlAttrPtr att_ptr, cur_att;
    int solo_xform=-1;
@@ -4608,7 +4781,7 @@ static int parse_flame_element(xmlNode *flame_node) {
    char *cpy;
    char tmps[2];
    int i;
-     int ix = 0;
+   int ix = 0;
    flam3_xform tmpcpy;
    flam3_chaos_entry *xaos=NULL;
    int num_xaos=0;
@@ -5003,9 +5176,7 @@ static int parse_flame_element(xmlNode *flame_node) {
       } else if (!xmlStrcmp(chld_node->name, (const xmlChar *)"xform") ||
                   !xmlStrcmp(chld_node->name, (const xmlChar *)"finalxform")) {
 
-         int j,k,xf;
-
-         xf = cp->num_xforms;
+         int xf = cp->num_xforms;
          
          if (!xmlStrcmp(chld_node->name, (const xmlChar *)"finalxform")) {
 
@@ -5015,6 +5186,7 @@ static int parse_flame_element(xmlNode *flame_node) {
             }
 
             flam3_add_xforms(cp, 1, 0, 1);
+            cp->xform[xf].var[0]=0.0;
             cp->final_xform_index = xf;
             /* Now, if present, the xform enable defaults to on */
             cp->final_xform_enable = 1;
@@ -5023,375 +5195,42 @@ static int parse_flame_element(xmlNode *flame_node) {
 
             /* Add one to the counter */
             flam3_add_xforms(cp, 1, 0, 0);
+            cp->xform[xf].var[0]=0.0;
             num_std_xforms++;
                      
          }
-
-         /* Even though most of these are already 0, set them all to be sure */
-         for (j = 0; j < flam3_nvariations; j++) {
-            cp->xform[xf].var[j] = 0.0;
-         }
-
-         /* Loop through the attributes of the xform element */
-         att_ptr = chld_node->properties;
-
-         if (att_ptr==NULL) {
-            fprintf(stderr,"Error: No attributes for xform element.\n");
+         
+         parse_xform_xml(chld_node, &(cp->xform[xf]), &num_xaos, xaos, num_std_xforms, 0);
+         
+         if (cp->final_xform_index == xf && cp->xform[xf].density != 0.0) {
+            fprintf(stderr,"Error: Final xforms should not have weight specified.\n");
             return(1);
          }
-
-         for (cur_att=att_ptr; cur_att; cur_att = cur_att->next) {
-
-
-            att_str = (char *) xmlGetProp(chld_node,cur_att->name);
-
-            cpy = att_str;
-
-            if (!xmlStrcmp(cur_att->name, (const xmlChar *)"weight")) {
-               if (cp->final_xform_index==xf) {
-                  fprintf(stderr,"Error: Final xforms should not have weight specified.\n");
-                  xmlFree(att_str);
-                  return(1);
-               }
-               cp->xform[xf].density = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"enabled")) {
-               cp->final_xform_enable = flam3_atoi(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"symmetry")) {
-               /* Deprecated.  Set both color_speed and animate to this value. */
-               cp->xform[xf].color_speed = flam3_atof(att_str);
-               cp->xform[xf].animate = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"color_speed")) {
-               cp->xform[xf].color_speed = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"animate")) {
-               cp->xform[xf].animate = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"color")) {
-               double tmpc1;
-               cp->xform[xf].color = 0.0;
-               /* Try two coords first */
-               if (sscanf(att_str, "%lf %lf%1s", &cp->xform[xf].color, &tmpc1, tmps) != 2) {
-                  /* Try one color */
-                  if (sscanf(att_str, "%lf%1s", &cp->xform[xf].color,tmps) != 1) {
-                     fprintf(stderr,"Error: malformed xform color attribute '%s'\n",att_str);
-                     xmlFree(att_str);
-                     return(1);
-                  }
-               }            
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"var1")) {
-               for (j=0; j < flam3_nvariations; j++) {
-                  cp->xform[xf].var[j] = 0.0;
-               }
-               j = flam3_atoi(att_str);
-
-               if (j < 0 || j >= flam3_nvariations) {
-                  fprintf(stderr,"Error:  Bad variation (%d)\n",j);
-                  xmlFree(att_str);
-                  return(1);
-               }
-
-               cp->xform[xf].var[j] = 1.0;
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"var")) {
-               for (j=0; j < flam3_nvariations; j++) {
-                  char *cpy2;
-                  errno=0;
-                  cp->xform[xf].var[j] = strtod(cpy, &cpy2);
-                  if (errno != 0 || cpy==cpy2) {
-                     fprintf(stderr,"error: bad value in var attribute '%s'\n",att_str);
-                     xmlFree(att_str);
-                     return(1);
-                  }
-                  cpy=cpy2;
-               }
-
-               if (cpy != att_str+strlen(att_str)) {
-                  fprintf(stderr,"error: extra chars at the end of var attribute '%s'\n",att_str);
-                  xmlFree(att_str);
-                  return(1);
-               }
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"chaos")) {
-               /* Chaos scalars */
-               
-               char *tok;
-               double scal;
-               int toi=0;
-               /* The att string contains at least one value, delimited by a space */
-               tok = strtok(cpy," ");
-               while (tok!=NULL) {
-                  scal = flam3_atof(tok);
-                  
-                  /* Skip 1.0 entries */
-                  if (scal==1.0) {
-                     toi++;
-                     tok = strtok(NULL," ");
-                     continue;
-                  }
-                  
-                  /* Realloc the xaos list */
-                  xaos = realloc(xaos,(num_xaos+1) * sizeof(flam3_chaos_entry));
-
-                  /* Populate the xaos list */
-                  xaos[num_xaos].from = num_std_xforms;
-                  xaos[num_xaos].to = toi;
-                  xaos[num_xaos].scalar = scal;
-                  toi++;
-                  num_xaos++;
-                                    
-                  /* Get the next token */
-                  tok = strtok(NULL," ");
-               }
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"plotmode")) {
-               if (!strcmp("off", att_str))
-                  cp->xform[xf].visibility = 0.0;
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"visibility")) {
-               cp->xform[xf].visibility = flam3_atof(att_str);
-               
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"coefs")) {
-               for (k=0; k<3; k++) {
-                  for (j=0; j<2; j++) {
-                     char *cpy2;
-                     errno = 0;
-                     cp->xform[xf].c[k][j] = strtod(cpy, &cpy2);
-                     if (errno != 0 || cpy==cpy2) {
-                        fprintf(stderr,"error: bad value in coefs attribute '%s'\n",att_str);
-                        xmlFree(att_str);
-                        return(1);
-                     }
-                     cpy=cpy2;
-                  }
-               }
-               if (cpy != att_str+strlen(att_str)) {
-                  fprintf(stderr,"error: extra chars at the end of coefs attribute '%s'\n",att_str);
-                  xmlFree(att_str);
-                  return(1);
-               }
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"post")) {
-               for (k = 0; k < 3; k++) {
-                  for (j = 0; j < 2; j++) {
-                     char *cpy2;
-                     errno = 0;
-                     cp->xform[xf].post[k][j] = strtod(cpy, &cpy2);
-                     if (errno != 0 || cpy==cpy2) {
-                        fprintf(stderr,"error: bad value in post attribute '%s'\n",att_str);
-                        xmlFree(att_str);
-                        return(1);
-                     }
-                     cpy=cpy2;
-                  }
-               }
-               if (cpy != att_str+strlen(att_str)) {
-                  fprintf(stderr,"error: extra chars at end of post attribute '%s'\n",att_str);
-                  xmlFree(att_str);
-                  return(1);
-               }
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"blob_low")) {
-               cp->xform[xf].blob_low = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"blob_high")) {
-               cp->xform[xf].blob_high = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"blob_waves")) {
-               cp->xform[xf].blob_waves = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pdj_a")) {
-               cp->xform[xf].pdj_a = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pdj_b")) {
-               cp->xform[xf].pdj_b = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pdj_c")) {
-               cp->xform[xf].pdj_c = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pdj_d")) {
-               cp->xform[xf].pdj_d = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"fan2_x")) {
-               cp->xform[xf].fan2_x = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"fan2_y")) {
-               cp->xform[xf].fan2_y = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rings2_val")) {
-               cp->xform[xf].rings2_val = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"perspective_angle")) {
-               cp->xform[xf].perspective_angle = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"perspective_dist")) {
-               cp->xform[xf].perspective_dist = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"julian_power")) {
-               cp->xform[xf].juliaN_power = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"julian_dist")) {
-               cp->xform[xf].juliaN_dist = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"juliascope_power")) {
-               cp->xform[xf].juliaScope_power = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"juliascope_dist")) {
-               cp->xform[xf].juliaScope_dist = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"radial_blur_angle")) {
-               cp->xform[xf].radialBlur_angle = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pie_slices")) {
-               cp->xform[xf].pie_slices = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pie_rotation")) {
-               cp->xform[xf].pie_rotation = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pie_thickness")) {
-               cp->xform[xf].pie_thickness = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"ngon_sides")) {
-               cp->xform[xf].ngon_sides = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"ngon_power")) {
-               cp->xform[xf].ngon_power = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"ngon_circle")) {
-               cp->xform[xf].ngon_circle = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"ngon_corners")) {
-               cp->xform[xf].ngon_corners = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curl_c1")) {
-               cp->xform[xf].curl_c1 = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curl_c2")) {
-               cp->xform[xf].curl_c2 = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rectangles_x")) {
-               cp->xform[xf].rectangles_x = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rectangles_y")) {
-               cp->xform[xf].rectangles_y = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"amw_amp")) {
-               cp->xform[xf].amw_amp = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"disc2_rot")) {
-               cp->xform[xf].disc2_rot = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"disc2_twist")) {
-               cp->xform[xf].disc2_twist = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_rnd")) {
-               cp->xform[xf].supershape_rnd = flam3_atof(att_str);
-               /* Limit to [0,1] */
-               if (cp->xform[xf].supershape_rnd<0)
-                  cp->xform[xf].supershape_rnd=0;
-               else if (cp->xform[xf].supershape_rnd>1)
-                  cp->xform[xf].supershape_rnd=1;
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_m")) {
-               cp->xform[xf].supershape_m = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_n1")) {
-               cp->xform[xf].supershape_n1 = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_n2")) {
-               cp->xform[xf].supershape_n2 = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_n3")) {
-               cp->xform[xf].supershape_n3 = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_holes")) {
-               cp->xform[xf].supershape_holes = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"flower_petals")) {
-               cp->xform[xf].flower_petals = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"flower_holes")) {
-               cp->xform[xf].flower_holes = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"conic_eccentricity")) {
-               cp->xform[xf].conic_eccen = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"conic_holes")) {
-               cp->xform[xf].conic_holes = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"parabola_height")) {
-               cp->xform[xf].parabola_height = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"parabola_width")) {
-               cp->xform[xf].parabola_width = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"bent2_x")) {
-               cp->xform[xf].bent2_x = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"bent2_y")) {
-               cp->xform[xf].bent2_y = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"bipolar_shift")) {
-               cp->xform[xf].bipolar_shift = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"cell_size")) {
-               cp->xform[xf].cell_size = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"cpow_i")) {
-               cp->xform[xf].cpow_i = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"cpow_r")) {
-               cp->xform[xf].cpow_r = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"cpow_power")) {
-               cp->xform[xf].cpow_power = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curve_xamp")) {
-               cp->xform[xf].curve_xamp = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curve_yamp")) {
-               cp->xform[xf].curve_yamp = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curve_xlength")) {
-               cp->xform[xf].curve_xlength = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curve_ylength")) {
-               cp->xform[xf].curve_ylength = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"escher_beta")) {
-               cp->xform[xf].escher_beta = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"lazysusan_x")) {
-               cp->xform[xf].lazysusan_x = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"lazysusan_y")) {
-               cp->xform[xf].lazysusan_y = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"lazysusan_spin")) {
-               cp->xform[xf].lazysusan_spin = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"lazysusan_space")) {
-               cp->xform[xf].lazysusan_space = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"lazysusan_twist")) {
-               cp->xform[xf].lazysusan_twist = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"modulus_x")) {
-               cp->xform[xf].modulus_x = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"modulus_y")) {
-               cp->xform[xf].modulus_y = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscope_separation")) {
-               cp->xform[xf].oscope_separation = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscope_frequency")) {
-               cp->xform[xf].oscope_frequency = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscope_amplitude")) {
-               cp->xform[xf].oscope_amplitude = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscope_damping")) {
-               cp->xform[xf].oscope_damping = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"popcorn2_x")) {
-               cp->xform[xf].popcorn2_x = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"popcorn2_y")) {
-               cp->xform[xf].popcorn2_y = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"popcorn2_c")) {
-               cp->xform[xf].popcorn2_c = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"separation_x")) {
-               cp->xform[xf].separation_x = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"separation_xinside")) {
-               cp->xform[xf].separation_xinside = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"separation_y")) {
-               cp->xform[xf].separation_y = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"separation_yinside")) {
-               cp->xform[xf].separation_yinside = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"split_xsize")) {
-               cp->xform[xf].split_xsize = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"split_ysize")) {
-               cp->xform[xf].split_ysize = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"splits_x")) {
-               cp->xform[xf].splits_x = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"splits_y")) {
-               cp->xform[xf].splits_y = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"stripes_space")) {
-               cp->xform[xf].stripes_space = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"stripes_warp")) {
-               cp->xform[xf].stripes_warp = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_angle")) {
-               cp->xform[xf].wedge_angle = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_hole")) {
-               cp->xform[xf].wedge_hole = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_count")) {
-               cp->xform[xf].wedge_count = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_swirl")) {
-               cp->xform[xf].wedge_swirl = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_julia_angle")) {
-               cp->xform[xf].wedge_julia_angle = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_julia_count")) {
-               cp->xform[xf].wedge_julia_count = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_julia_power")) {
-               cp->xform[xf].wedge_julia_power = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_julia_dist")) {
-               cp->xform[xf].wedge_julia_dist = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_sph_angle")) {
-               cp->xform[xf].wedge_sph_angle = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_sph_hole")) {
-               cp->xform[xf].wedge_sph_hole = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_sph_count")) {
-               cp->xform[xf].wedge_sph_count = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_sph_swirl")) {
-               cp->xform[xf].wedge_sph_swirl = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"whorl_inside")) {
-               cp->xform[xf].whorl_inside = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"whorl_outside")) {
-               cp->xform[xf].whorl_outside = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"waves2_scalex")) {
-               cp->xform[xf].waves2_scalex = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"waves2_scaley")) {
-               cp->xform[xf].waves2_scaley = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"waves2_freqx")) {
-               cp->xform[xf].waves2_freqx = flam3_atof(att_str);
-            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"waves2_freqy")) {
-               cp->xform[xf].waves2_freqy = flam3_atof(att_str);
-            } else {
-               int v = var2n((char *) cur_att->name);
-               if (v != flam3_variation_none)
-                  cp->xform[xf].var[v] = flam3_atof(att_str);
-               else
-                  fprintf(stderr,"Warning: unrecognized variation %s.  Ignoring.\n",(char *)cur_att->name);
-            }
-
-
-            xmlFree(att_str);
+         
+         /* Check for non-zero motion_* params */
+         if (cp->xform[xf].motion_freq != 0 || cp->xform[xf].motion_func != 0) {
+            fprintf(stderr,"Error: Motion parameters should not be specified in xforms.\n");
+            return(1);
          }
+         
+         
+         /* Motion Language:  Check the xform element for children - should be named 'motion'. */
+         for (motion_node=chld_node->children; motion_node; motion_node = motion_node->next) {
+                  
+            if (!xmlStrcmp(motion_node->name, (const xmlChar *)"motion")) {
+            
+               int nm = cp->xform[xf].num_motion;
+
+               /* Add motion element to xform */
+               flam3_add_motion_element( &cp->xform[xf] );            
+               
+               /* Read motion xml */
+               parse_xform_xml(motion_node, &(cp->xform[xf].motion[nm]), NULL, NULL, 0, 1);
+               
+            }
+            
+         }
+            
 
       } else if (!xmlStrcmp(chld_node->name, (const xmlChar *)"edit")) {
 
@@ -5444,6 +5283,385 @@ static int parse_flame_element(xmlNode *flame_node) {
    
    return(0);
 
+}
+
+static int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_xaos, flam3_chaos_entry *xaos, int numstd, int motionxf) {
+
+   xmlAttrPtr att_ptr, cur_att;
+   char *att_str, *cpy;
+   char tmps[2];
+   int j,k;
+
+   /* Loop through the attributes of the xform element */
+   att_ptr = chld_node->properties;
+
+   if (att_ptr==NULL) {
+      fprintf(stderr,"Error: No attributes for element.\n");
+      return(1);
+   }
+
+   for (cur_att=att_ptr; cur_att; cur_att = cur_att->next) {
+
+      att_str = (char *) xmlGetProp(chld_node,cur_att->name);
+
+      cpy = att_str;
+      if (!xmlStrcmp(cur_att->name, (const xmlChar *)"weight")) {
+         this_xform->density = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"symmetry")) {
+         /* Deprecated.  Set both color_speed and animate to this value. */
+         this_xform->color_speed = flam3_atof(att_str);
+         this_xform->animate = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"color_speed")) {
+         this_xform->color_speed = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"animate")) {
+         this_xform->animate = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"motion_freq")) {
+         this_xform->motion_freq = flam3_atoi(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"motion_func")) {
+         /* This will change to be enumerated */
+         this_xform->motion_func = flam3_atoi(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"color")) {
+         double tmpc1;
+         this_xform->color = 0.0;
+         /* Try two coords first */
+         if (sscanf(att_str, "%lf %lf%1s", &this_xform->color, &tmpc1, tmps) != 2) {
+            /* Try one color */
+            if (sscanf(att_str, "%lf%1s", &this_xform->color,tmps) != 1) {
+               fprintf(stderr,"Error: malformed xform color attribute '%s'\n",att_str);
+               xmlFree(att_str);
+               return(1);
+            }
+         }            
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"var1")) {
+         for (j=0; j < flam3_nvariations; j++) {
+            this_xform->var[j] = 0.0;
+         }
+         j = flam3_atoi(att_str);
+
+         if (j < 0 || j >= flam3_nvariations) {
+            fprintf(stderr,"Error:  Bad variation (%d)\n",j);
+            xmlFree(att_str);
+            return(1);
+         }
+
+         this_xform->var[j] = 1.0;
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"var")) {
+         for (j=0; j < flam3_nvariations; j++) {
+            char *cpy2;
+            errno=0;
+            this_xform->var[j] = strtod(cpy, &cpy2);
+            if (errno != 0 || cpy==cpy2) {
+               fprintf(stderr,"error: bad value in var attribute '%s'\n",att_str);
+               xmlFree(att_str);
+               return(1);
+            }
+            cpy=cpy2;
+         }
+
+         if (cpy != att_str+strlen(att_str)) {
+            fprintf(stderr,"error: extra chars at the end of var attribute '%s'\n",att_str);
+            xmlFree(att_str);
+            return(1);
+         }
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"chaos")) {      
+         /* Chaos scalars */
+         
+         char *tok;
+         double scal;
+         int toi=0;
+         
+         if (motionxf==1) {
+            fprintf(stderr,"error: motion element cannot have a chaos attribute.\n");
+            xmlFree(att_str);
+            return(1);
+         }
+         
+         /* The att string contains at least one value, delimited by a space */
+         tok = strtok(cpy," ");
+         while (tok!=NULL) {
+            scal = flam3_atof(tok);
+            
+            /* Skip 1.0 entries */
+            if (scal==1.0) {
+               toi++;
+               tok = strtok(NULL," ");
+               continue;
+            }
+            
+            /* Realloc the xaos list */
+            xaos = realloc(xaos,(*num_xaos+1) * sizeof(flam3_chaos_entry));
+
+            /* Populate the xaos list */
+            xaos[*num_xaos].from = numstd;
+            xaos[*num_xaos].to = toi;
+            xaos[*num_xaos].scalar = scal;
+            toi++;
+            *num_xaos++;
+                              
+            /* Get the next token */
+            tok = strtok(NULL," ");
+         }
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"plotmode")) {
+
+         if (motionxf==1) {
+            fprintf(stderr,"error: motion element cannot have a plotmode attribute.\n");
+            xmlFree(att_str);
+            return(1);
+         }
+         
+         if (!strcmp("off", att_str))
+            this_xform->visibility = 0.0;
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"visibility")) {
+         this_xform->visibility = flam3_atof(att_str);
+         
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"coefs")) {
+         for (k=0; k<3; k++) {
+            for (j=0; j<2; j++) {
+               char *cpy2;
+               errno = 0;
+               this_xform->c[k][j] = strtod(cpy, &cpy2);
+               if (errno != 0 || cpy==cpy2) {
+                  fprintf(stderr,"error: bad value in coefs attribute '%s'\n",att_str);
+                  xmlFree(att_str);
+                  return(1);
+               }
+               cpy=cpy2;
+            }
+         }
+         if (cpy != att_str+strlen(att_str)) {
+            fprintf(stderr,"error: extra chars at the end of coefs attribute '%s'\n",att_str);
+            xmlFree(att_str);
+            return(1);
+         }
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"post")) {
+         for (k = 0; k < 3; k++) {
+            for (j = 0; j < 2; j++) {
+               char *cpy2;
+               errno = 0;
+               this_xform->post[k][j] = strtod(cpy, &cpy2);
+               if (errno != 0 || cpy==cpy2) {
+                  fprintf(stderr,"error: bad value in post attribute '%s'\n",att_str);
+                  xmlFree(att_str);
+                  return(1);
+               }
+               cpy=cpy2;
+            }
+         }
+         if (cpy != att_str+strlen(att_str)) {
+            fprintf(stderr,"error: extra chars at end of post attribute '%s'\n",att_str);
+            xmlFree(att_str);
+            return(1);
+         }
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"blob_low")) {
+         this_xform->blob_low = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"blob_high")) {
+         this_xform->blob_high = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"blob_waves")) {
+         this_xform->blob_waves = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pdj_a")) {
+         this_xform->pdj_a = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pdj_b")) {
+         this_xform->pdj_b = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pdj_c")) {
+         this_xform->pdj_c = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pdj_d")) {
+         this_xform->pdj_d = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"fan2_x")) {
+         this_xform->fan2_x = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"fan2_y")) {
+         this_xform->fan2_y = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rings2_val")) {
+         this_xform->rings2_val = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"perspective_angle")) {
+         this_xform->perspective_angle = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"perspective_dist")) {
+         this_xform->perspective_dist = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"julian_power")) {
+         this_xform->juliaN_power = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"julian_dist")) {
+         this_xform->juliaN_dist = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"juliascope_power")) {
+         this_xform->juliaScope_power = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"juliascope_dist")) {
+         this_xform->juliaScope_dist = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"radial_blur_angle")) {
+         this_xform->radialBlur_angle = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pie_slices")) {
+         this_xform->pie_slices = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pie_rotation")) {
+         this_xform->pie_rotation = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pie_thickness")) {
+         this_xform->pie_thickness = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"ngon_sides")) {
+         this_xform->ngon_sides = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"ngon_power")) {
+         this_xform->ngon_power = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"ngon_circle")) {
+         this_xform->ngon_circle = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"ngon_corners")) {
+         this_xform->ngon_corners = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curl_c1")) {
+         this_xform->curl_c1 = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curl_c2")) {
+         this_xform->curl_c2 = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rectangles_x")) {
+         this_xform->rectangles_x = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rectangles_y")) {
+         this_xform->rectangles_y = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"amw_amp")) {
+         this_xform->amw_amp = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"disc2_rot")) {
+         this_xform->disc2_rot = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"disc2_twist")) {
+         this_xform->disc2_twist = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_rnd")) {
+         this_xform->supershape_rnd = flam3_atof(att_str);
+         /* Limit to [0,1] */
+         if (this_xform->supershape_rnd<0)
+            this_xform->supershape_rnd=0;
+         else if (this_xform->supershape_rnd>1)
+            this_xform->supershape_rnd=1;
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_m")) {
+         this_xform->supershape_m = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_n1")) {
+         this_xform->supershape_n1 = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_n2")) {
+         this_xform->supershape_n2 = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_n3")) {
+         this_xform->supershape_n3 = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_holes")) {
+         this_xform->supershape_holes = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"flower_petals")) {
+         this_xform->flower_petals = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"flower_holes")) {
+         this_xform->flower_holes = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"conic_eccentricity")) {
+         this_xform->conic_eccen = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"conic_holes")) {
+         this_xform->conic_holes = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"parabola_height")) {
+         this_xform->parabola_height = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"parabola_width")) {
+         this_xform->parabola_width = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"bent2_x")) {
+         this_xform->bent2_x = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"bent2_y")) {
+         this_xform->bent2_y = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"bipolar_shift")) {
+         this_xform->bipolar_shift = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"cell_size")) {
+         this_xform->cell_size = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"cpow_i")) {
+         this_xform->cpow_i = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"cpow_r")) {
+         this_xform->cpow_r = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"cpow_power")) {
+         this_xform->cpow_power = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curve_xamp")) {
+         this_xform->curve_xamp = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curve_yamp")) {
+         this_xform->curve_yamp = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curve_xlength")) {
+         this_xform->curve_xlength = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"curve_ylength")) {
+         this_xform->curve_ylength = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"escher_beta")) {
+         this_xform->escher_beta = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"lazysusan_x")) {
+         this_xform->lazysusan_x = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"lazysusan_y")) {
+         this_xform->lazysusan_y = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"lazysusan_spin")) {
+         this_xform->lazysusan_spin = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"lazysusan_space")) {
+         this_xform->lazysusan_space = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"lazysusan_twist")) {
+         this_xform->lazysusan_twist = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"modulus_x")) {
+         this_xform->modulus_x = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"modulus_y")) {
+         this_xform->modulus_y = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscope_separation")) {
+         this_xform->oscope_separation = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscope_frequency")) {
+         this_xform->oscope_frequency = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscope_amplitude")) {
+         this_xform->oscope_amplitude = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscope_damping")) {
+         this_xform->oscope_damping = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"popcorn2_x")) {
+         this_xform->popcorn2_x = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"popcorn2_y")) {
+         this_xform->popcorn2_y = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"popcorn2_c")) {
+         this_xform->popcorn2_c = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"separation_x")) {
+         this_xform->separation_x = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"separation_xinside")) {
+         this_xform->separation_xinside = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"separation_y")) {
+         this_xform->separation_y = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"separation_yinside")) {
+         this_xform->separation_yinside = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"split_xsize")) {
+         this_xform->split_xsize = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"split_ysize")) {
+         this_xform->split_ysize = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"splits_x")) {
+         this_xform->splits_x = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"splits_y")) {
+         this_xform->splits_y = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"stripes_space")) {
+         this_xform->stripes_space = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"stripes_warp")) {
+         this_xform->stripes_warp = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_angle")) {
+         this_xform->wedge_angle = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_hole")) {
+         this_xform->wedge_hole = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_count")) {
+         this_xform->wedge_count = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_swirl")) {
+         this_xform->wedge_swirl = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_julia_angle")) {
+         this_xform->wedge_julia_angle = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_julia_count")) {
+         this_xform->wedge_julia_count = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_julia_power")) {
+         this_xform->wedge_julia_power = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_julia_dist")) {
+         this_xform->wedge_julia_dist = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_sph_angle")) {
+         this_xform->wedge_sph_angle = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_sph_hole")) {
+         this_xform->wedge_sph_hole = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_sph_count")) {
+         this_xform->wedge_sph_count = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"wedge_sph_swirl")) {
+         this_xform->wedge_sph_swirl = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"whorl_inside")) {
+         this_xform->whorl_inside = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"whorl_outside")) {
+         this_xform->whorl_outside = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"waves2_scalex")) {
+         this_xform->waves2_scalex = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"waves2_scaley")) {
+         this_xform->waves2_scaley = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"waves2_freqx")) {
+         this_xform->waves2_freqx = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"waves2_freqy")) {
+         this_xform->waves2_freqy = flam3_atof(att_str);
+      } else {
+         int v = var2n((char *) cur_att->name);
+         if (v != flam3_variation_none)
+            this_xform->var[v] = flam3_atof(att_str);
+         else
+            fprintf(stderr,"Warning: unrecognized variation %s.  Ignoring.\n",(char *)cur_att->name);
+      }
+
+
+      xmlFree(att_str);
+   }
 }
 
 int flam3_count_nthreads(void) {

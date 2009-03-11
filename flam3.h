@@ -198,7 +198,7 @@ typedef struct {
 } flam3_image_store;
 
 
-typedef struct {
+typedef struct xform {
    double var[flam3_nvariations];   /* interp coefs between variations */
    double c[3][2];      /* the coefs to the affine part of the function */
    double post[3][2];   /* the post transform */
@@ -411,6 +411,13 @@ typedef struct {
    int num_active_vars;
    double active_var_weights[flam3_nvariations];
    int varFunc[flam3_nvariations];
+   
+   int motion_freq;
+   int motion_func;
+   
+   struct xform *motion;
+   int num_motion;
+   
 
 } flam3_xform;
 
@@ -499,6 +506,7 @@ typedef struct {
 } flam3_chaos_entry;
 
 /* xform manipulation */
+void flam3_add_motion_element(flam3_xform *xf);
 void flam3_add_xforms(flam3_genome *cp, int num_to_add, int interp_padding, int final_flag);
 void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete);
 void flam3_copy(flam3_genome *dest, flam3_genome *src);
@@ -517,6 +525,8 @@ void clear_cp(flam3_genome *cp, int def_flag);
    nsamples iterations and save them in the samples array */
 int flam3_iterate(flam3_genome *g, int nsamples, int fuse, double *samples,
                      unsigned short *xform_distrib, randctx *rc);
+
+void apply_motion_parameters(flam3_xform *xf, flam3_xform *addto, double blend);
 
 /* genomes is array ngenomes long, with times set and in ascending order.
    interpolate to the requested time and return in result */
@@ -627,5 +637,9 @@ void flam3_calc_newrgb(double *cbuf, double ls, double highpow, double *newrgb);
 #define flam3_temporal_box 0
 #define flam3_temporal_gaussian 1
 #define flam3_temporal_exp 2
+
+/* Motion function indices */
+#define MOTION_SINE 1
+
 
 #endif

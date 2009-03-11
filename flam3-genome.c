@@ -257,17 +257,26 @@ spin(int frame, double blend, flam3_genome *parent, flam3_genome *templ)
   flam3_genome result;
   char action[50];
   xmlDocPtr doc;
+  int i,j;
 
   memset(&result, 0, sizeof(flam3_genome));
   flam3_copy(&result,parent);
+
+  /*
+   * Insert motion magic here :
+   * if there are motion elements, we will modify the contents of
+   * the result genome before flam3_rotate is called.
+   */
   
-  //  symm = (int *)calloc(result.num_xforms,sizeof(int));
-  //  for (si=0;si<result.num_xforms;si++)
-  //      symm[si] = 0.0;
+  for (i=0;i<parent->num_xforms;i++) {
+     if (parent->xform[i].num_motion>0) {
+        /* Apply motion parameters to result.xform[i] using blend parameter */
+        apply_motion_parameters(&parent->xform[i], &result.xform[i], blend);
+     }
+  }
+
 
   flam3_rotate(&result, blend*360.0,result.interpolation_type);
-  
-  // free(symm);
   
   if (templ)
      flam3_apply_template(&result, templ);
