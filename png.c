@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <png.h>
 #include <setjmp.h>
+#include <arpa/inet.h>
 
 #include "config.h"
 #include "img.h"
