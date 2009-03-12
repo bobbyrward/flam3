@@ -312,13 +312,27 @@ void spin_inter(int frame, double blend, int seqflag, flam3_genome *parents, fla
   flam3_genome result;
   char action[50];
   xmlDocPtr doc;
+  int i,si;
 
   memset(spun, 0, 2*sizeof(flam3_genome));
   memset(spun_prealign, 0, 2*sizeof(flam3_genome));
   memset(&result, 0, sizeof(flam3_genome));
 
-  flam3_copy(&(spun_prealign[0]), &(parents[0]));
-  flam3_copy(&(spun_prealign[1]), &(parents[1]));
+  /*
+   * Insert motion magic here :
+   * if there are motion elements, we will modify the contents of
+   * the prealign genomes before we rotate and interpolate.
+   */
+  
+  for (si=0;si<2;si++) {
+     flam3_copy(&(spun_prealign[si]), &(parents[si]));
+     for (i=0;i<parents[si].num_xforms;i++) {
+        if (parents[si].xform[i].num_motion>0) {
+           /* Apply motion parameters to result.xform[i] using blend parameter */
+           apply_motion_parameters(&parents[si].xform[i], &spun_prealign[si].xform[i], blend);
+        }
+     }
+  }
 
   flam3_align(spun, spun_prealign, 2);
 

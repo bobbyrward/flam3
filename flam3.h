@@ -639,7 +639,9 @@ void flam3_calc_newrgb(double *cbuf, double ls, double highpow, double *newrgb);
 #define flam3_temporal_exp 2
 
 /* Motion function indices */
-#define MOTION_SINE 1
+#define MOTION_SIN 1
+#define MOTION_TRIANGLE 2
+#define MOTION_COS 3
 
 
 #endif

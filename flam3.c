@@ -3186,8 +3186,24 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
 double motion_funcs(int funcnum, double timeval) {
 
    /* motion funcs should be cyclic, and equal to 0 at integral time values */
-   if (funcnum==MOTION_SINE) {
+   /* abs peak values should be not be greater than 1                       */
+   if (funcnum==MOTION_SIN) {
       return (sin(2.0*M_PI*timeval));
+   } else if (funcnum==MOTION_TRIANGLE) {
+      double fr = fmod(timeval,1.0);
+      
+      if (fr<0) fr+= 1.0;
+      
+      if (fr<=.25)
+         fr = 4.0 * fr;
+      else if (fr<=.75)
+         fr = -4.0 * fr + 2.0;
+      else
+         fr = 4.0 * fr - 4.0;
+     
+      return(fr);
+   } else if (funcnum==MOTION_COS) {
+      return(1.0-cos(2.0*M_PI*timeval));
    }
    
 }
@@ -5200,7 +5216,8 @@ static int parse_flame_element(xmlNode *flame_node) {
                      
          }
          
-         parse_xform_xml(chld_node, &(cp->xform[xf]), &num_xaos, xaos, num_std_xforms, 0);
+         if (parse_xform_xml(chld_node, &(cp->xform[xf]), &num_xaos, xaos, num_std_xforms, 0) != 0)
+            return(1);
          
          if (cp->final_xform_index == xf && cp->xform[xf].density != 0.0) {
             fprintf(stderr,"Error: Final xforms should not have weight specified.\n");
@@ -5225,7 +5242,8 @@ static int parse_flame_element(xmlNode *flame_node) {
                flam3_add_motion_element( &cp->xform[xf] );            
                
                /* Read motion xml */
-               parse_xform_xml(motion_node, &(cp->xform[xf].motion[nm]), NULL, NULL, 0, 1);
+               if (parse_xform_xml(motion_node, &(cp->xform[xf].motion[nm]), NULL, NULL, 0, 1) != 0)
+                  return(1);
                
             }
             
@@ -5318,8 +5336,18 @@ static int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"motion_freq")) {
          this_xform->motion_freq = flam3_atoi(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"motion_func")) {
-         /* This will change to be enumerated */
-         this_xform->motion_func = flam3_atoi(att_str);
+         if (!strcmp("sin", att_str)) {
+            this_xform->motion_func = MOTION_SIN;
+         } else if (!strcmp("triangle",att_str)) {
+            this_xform->motion_func = MOTION_TRIANGLE;
+         } else if (!strcmp("cos",att_str)) {
+            this_xform->motion_func = MOTION_COS;
+         } else {
+            fprintf(stderr,"Error: unknown motion function '%s'\n",att_str);
+            xmlFree(att_str);
+            return(1);
+         }
+
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"color")) {
          double tmpc1;
          this_xform->color = 0.0;
@@ -5662,6 +5690,7 @@ static int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_
 
       xmlFree(att_str);
    }
+   return(0);
 }
 
 int flam3_count_nthreads(void) {
@@ -6225,7 +6254,11 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
             fprintf(f, "   <xform weight=\"%g\" color=\"%g\" ", cp->xform[i].density, cp->xform[i].color);
          }
          
-         fprintf(f, "color_speed=\"%g\" animate=\"%g\" ", cp->xform[i].color_speed, cp->xform[i].animate);
+         fprintf(f, "color_speed=\"%g\" ", cp->xform[i].color_speed);
+         
+         if (i!=cp->final_xform_index)
+            fprintf(f, "animate=\"%g\" ", cp->xform[i].animate);
+            
 //         fprintf(f, "symmetry=\"%g\" ", cp->xform[i].symmetry);
 
          for (j = 0; j < flam3_nvariations; j++) {
