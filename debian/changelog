@@ -1,3 +1,15 @@
+flam3 (2.7.18-0ubuntu1~ppa1) intrepid; urgency=low
+
+  * Bug fixes from upstream.
+
+ -- Spotworks LLC <ubuntu@spotworks.com>  Wed, 18 Mar 2009 22:29:58 -0600
+
+flam3 (2.7.18-0ubuntu1~ppa0) hardy; urgency=low
+
+  * Bug fixes from upstream.
+
+ -- Spotworks LLC <ubuntu@spotworks.com>  Tue, 17 Mar 2009 20:52:50 -0600
+
 flam3 (2.7.17-0ubuntu1~ppa0) hardy; urgency=low
 
   * Bug fixes from upstream.
