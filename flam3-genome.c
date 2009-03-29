@@ -1430,6 +1430,12 @@ main(argc, argv)
             }
             strcat(trystr,ministr);
              }
+             
+            if (used_parent==0 && parent0[i0].final_xform_enable)
+               got0 = 1;
+            else if (used_parent==1 && parent1[i1].final_xform_enable)
+               got1 = 1;
+               
          } while ((i > 1) && !(got0 && got1));
 
          add_to_action(action,trystr);
