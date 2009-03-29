@@ -219,6 +219,8 @@ int main(int argc, char **argv) {
    }
 
    for (i = 0; i < ncps; i++) {
+      /* Force ntemporal_samples to 1 for -render */
+      cps[i].ntemporal_samples = 1;
       cps[i].sample_density *= qs;
       cps[i].height = (int)(cps[i].height * ss);
       cps[i].width = (int)(cps[i].width * ss);
