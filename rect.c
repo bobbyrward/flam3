@@ -175,15 +175,8 @@ static void iter_thread(void *fth) {
             /* Skip if invisible */
             if (p[3]==0)
                continue;
-            //else {
-               /* There's two ways to do this...one is to threshold in the iter loop and plot */
-               /* everything that gets through, and the other is to scale all of the values   */
-               /* based on the visibility factor.  This code does the latter; the former is   */
-               /* in flam3.c */
-               
-               /* We're set to do the former in flam3.c, so skip this calculation */
-               //logvis = adjust_percentage(p[3]);
-            //}
+            else
+               logvis = p[3];
             
             b = buckets + (int)(ficp->ws0 * p0 - ficp->wb0s0) +
                 ficp->width * (int)(ficp->hs1 * p1 - ficp->hb1s1);
@@ -208,12 +201,13 @@ static void iter_thread(void *fth) {
                bump_no_overflow(b[0][1], ficp->dmap[color_index0].color[1]);
                bump_no_overflow(b[0][2], ficp->dmap[color_index0].color[2]);
                bump_no_overflow(b[0][3], ficp->dmap[color_index0].color[3]);
+               bump_no_overflow(b[0][4], 255.0);
             } else {
                bump_no_overflow(b[0][0], logvis*ficp->dmap[color_index0].color[0]);
                bump_no_overflow(b[0][1], logvis*ficp->dmap[color_index0].color[1]);
                bump_no_overflow(b[0][2], logvis*ficp->dmap[color_index0].color[2]);
                bump_no_overflow(b[0][3], logvis*ficp->dmap[color_index0].color[3]);
-            }
+               bump_no_overflow(b[0][4], 255.0);
 #else
             dbl_index0 = p[2] * CMAP_SIZE;
             color_index0 = (int) (dbl_index0);
@@ -252,11 +246,14 @@ static void iter_thread(void *fth) {
                bump_no_overflow(b[0][1], interpcolor[1]);
                bump_no_overflow(b[0][2], interpcolor[2]);
                bump_no_overflow(b[0][3], interpcolor[3]);
+               bump_no_overflow(b[0][4], 255.0);
+            //fprintf(stderr,"%10.8f %10.8f %10.8f %10.8f\n",b[0][0],b[0][1],b[0][2],b[0][3]);
             } else {
                bump_no_overflow(b[0][0], logvis*interpcolor[0]);
                bump_no_overflow(b[0][1], logvis*interpcolor[1]);
                bump_no_overflow(b[0][2], logvis*interpcolor[2]);
                bump_no_overflow(b[0][3], logvis*interpcolor[3]);
+               bump_no_overflow(b[0][4], 255.0);
             }
 #endif
 
@@ -434,48 +431,48 @@ static void render_rectangle(flam3_frame *spec, void *out,
       sumfilt=0.0;
 
       /* Define temporal deltas from center time */
-      for (i = 0; i < nbatches*ntemporal_samples; i++)
-            temporal_deltas[i] = (2.0 * ((double) i / ((nbatches*ntemporal_samples) - 1)) - 1.0)
+      for (i = 0; i < nn; i++)
+            temporal_deltas[i] = (2.0 * ((double) i / (nn - 1)) - 1.0)
                                   * (spec->genomes[0].temporal_filter_width/2.0);
 
       /* fill in the coefs */
       if (flam3_temporal_exp == spec->genomes[0].temporal_filter_type) {
-         for (i = 0; i < nbatches*ntemporal_samples; i++) {
+         for (i = 0; i < nn; i++) {
             double slpx;
 
             if (spec->genomes[0].temporal_filter_exp>=0)
-               slpx = ((double)i+1.0)/(nbatches*ntemporal_samples);
+               slpx = ((double)i+1.0)/nn;
             else
-               slpx = (double)(nbatches*ntemporal_samples - i) / (nbatches*ntemporal_samples);
+               slpx = (double)(nn - i)/nn;
 
             /* Scale the color based on these values */
             temporal_filter[i] = pow(slpx,fabs(spec->genomes[0].temporal_filter_exp));
-	    if (maxfilt < temporal_filter[i]) maxfilt = temporal_filter[i];
-	    
+            if (temporal_filter[i]>maxfilt) maxfilt = temporal_filter[i];
          }
 
       } else if (flam3_temporal_gaussian == spec->genomes[0].temporal_filter_type) {
 
          double nn2 = nn/2.0;
-         for (i = 0; i < nbatches*ntemporal_samples; i++) {
+         for (i = 0; i < nn; i++) {
             temporal_filter[i] = flam3_spatial_filter(flam3_gaussian_kernel,
                             flam3_spatial_support[flam3_gaussian_kernel]*fabs(i - nn2)/nn2);
-	    if (maxfilt < temporal_filter[i]) maxfilt = temporal_filter[i];
+            if (temporal_filter[i]>maxfilt) maxfilt = temporal_filter[i];
          }
 
       } else { // (flam3_temporal_box == spec->genomes[0].temporal_filter_type)
-         for (i=0; i<nn; i++)
+         for (i=0; i<nn; i++) {
             temporal_filter[i] = 1.0;
-	    
-	 maxfilt = 1.0;
+	      }
+	      maxfilt = 1.0;
       }
 
       /* Adjust the filter so that the max is 1.0, and */
       /* calculate the K2 scaling factor  */
-      for (i=0; i<nn; i++) {
+      for (i=0;i<nn;i++) {
          temporal_filter[i] /= maxfilt;
-	 sumfilt = sumfilt + temporal_filter[i];
+         sumfilt += temporal_filter[i];
       }
+         
       sumfilt = sumfilt / nn;
 
    } else {
@@ -652,15 +649,13 @@ static void render_rectangle(flam3_frame *spec, void *out,
                   de_filt_d = sqrt( (double)(dej*dej+dek*dek) ) / de_filt_h;
 
                   if (de_filt_d <= 1.0) {
-if (1) {
+
                      /* Gaussian */
-                     de_filt_sum += /*adjust_percentage*/(flam3_spatial_filter(flam3_gaussian_kernel,
-                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d));
-                     //de_filt_sum += flam3_gaussian_filter(flam3_gaussian_support*de_filt_d);
-} else {
-                     /* Epanichnikov */
-                     de_filt_sum += (1.0 - (de_filt_d * de_filt_d));
-}
+                     de_filt_sum += flam3_spatial_filter(flam3_gaussian_kernel,
+                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d)
+
+//                     /* Epanichnikov */
+//                     de_filt_sum += (1.0 - (de_filt_d * de_filt_d));
                   }
                }
             }
@@ -675,18 +670,14 @@ if (1) {
                   if (de_filt_d>1.0)
                      de_filter_coefs[filter_coef_idx] = 0.0;
                   else {
-if (1) {
+
                      /* Gaussian */
-                     de_filter_coefs[filter_coef_idx] =
-                         /*adjust_percentage*/(flam3_spatial_filter(flam3_gaussian_kernel,
-                            flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d))/de_filt_sum; 
-                         //flam3_gaussian_filter(flam3_gaussian_support*de_filt_d)/de_filt_sum;
-} else {
-                     /* Epanichnikov */
-                     de_filter_coefs[filter_coef_idx] = (1.0 - (de_filt_d * de_filt_d))/de_filt_sum;
-}
+                     de_filter_coefs[filter_coef_idx] = flam3_spatial_filter(flam3_gaussian_kernel,
+                            flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d)/de_filt_sum; 
+
+//                     /* Epanichnikov */
+//                     de_filter_coefs[filter_coef_idx] = (1.0 - (de_filt_d * de_filt_d))/de_filt_sum;
                   }
-//                  de_filter_coefs[filter_coef_idx] = adjust_percentage(de_filter_coefs[filter_coef_idx]);
                   
                   filter_coef_idx ++;
                }
@@ -950,7 +941,7 @@ if (1) {
                b = buckets + i + j*fic.width;
 
                /* Don't do anything if there's no hits here */
-               if (b[0][3] == 0)
+               if (b[0][4] == 0 || b[0][3] == 0)
                   continue;
 
                /* Count density in ssxss area   */
@@ -958,7 +949,7 @@ if (1) {
                for (ii=-ss; ii<=ss; ii++) {
                   for (jj=-ss; jj<=ss; jj++) {
                      b = buckets + (i + ii) + (j + jj)*fic.width;
-                     f_select += b[0][3]/255.0;
+                     f_select += b[0][4]/255.0;
                   }
                }
                

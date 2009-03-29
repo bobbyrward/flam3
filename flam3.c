@@ -192,6 +192,7 @@ static int parse_flame_element(xmlNode *);
 static int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_xaos, flam3_chaos_entry *xaos, int numstd, int motionxf);
 static int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *rc);
 static double adjust_percentage(double in);
+static void xform_precalc(flam3_genome *cp, int xi);
 
 void decode64( char *instring, char *outstring );
 void encode64( FILE *infile, FILE *outfile, int linesize);
@@ -2211,16 +2212,8 @@ int flam3_iterate(flam3_genome *cp, int n, int fuse,  double *samples, unsigned 
    p[3] = samples[3];
 
    /* Perform precalculations */   
-   for (i=0;i<cp->num_xforms;i++) {
-      perspective_precalc(&(cp->xform[i]));
-      juliaN_precalc(&(cp->xform[i]));
-      juliaScope_precalc(&(cp->xform[i]));
-      radial_blur_precalc(&(cp->xform[i]));
-      waves_precalc(&(cp->xform[i]));
-      disc2_precalc(&(cp->xform[i]));
-      supershape_precalc(&(cp->xform[i]));
-      wedgeJulia_precalc(&(cp->xform[i]));   
-   }
+   for (i=0;i<cp->num_xforms;i++)
+      xform_precalc(cp,i);
 
    for (i = -4*fuse; i < 4*n; i+=4) {
       if (cp->chaos_enable)
@@ -2288,11 +2281,12 @@ static int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *
 
    next_color = (p[2] + cp->xform[fn].color) * s1 + s * p[2];
    q[2] = next_color;
-   if (cp->xform[fn].vis_adjusted<1.0) {
-      q[3] = (flam3_random_isaac_01(rc) < cp->xform[fn].vis_adjusted);
-   } else {
-      q[3] = 1.0;
-   }
+   q[3] = cp->xform[fn].vis_adjusted;
+//   if (cp->xform[fn].vis_adjusted<1.0) {
+//      q[3] = (flam3_random_isaac_01(rc) < cp->xform[fn].vis_adjusted);
+//   } else {
+//      q[3] = 1.0;
+//   }
 
    f.tx = cp->xform[fn].c[0][0] * p[0] + cp->xform[fn].c[1][0] * p[1] + cp->xform[fn].c[2][0];
    f.ty = cp->xform[fn].c[0][1] * p[0] + cp->xform[fn].c[1][1] * p[1] + cp->xform[fn].c[2][1];
@@ -2519,6 +2513,58 @@ static int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *
 
 }
 
+void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc) {
+
+   /* We will evaluate the 'xi'th xform 'depth' times, over the following values:           */
+   /* x in [-range : range], y in [-range : range], with 2* (2*numvals+1)^2 values returned */ 
+   double p[4];
+   double incr;
+   int outi;
+   int xx,yy,dd;
+   
+   /* Prepare the function pointers */
+   prepare_xform_fn_ptrs(cp,rc);
+   
+   /* Calculate increment */
+   incr = range / (double)numvals;
+   
+   /* Perform precalculations */
+   xform_precalc(cp,xi);
+   
+   outi=0;
+   
+   /* Loop over the grid */
+   for (xx=-numvals;xx<=numvals;xx++) {
+      for (yy=-numvals;yy<=numvals;yy++) {
+      
+         /* Calculate the input coordinates */
+         p[0] = (double)xx * incr;
+         p[1] = (double)yy * incr;
+         
+         /* Loop over the depth */
+         for (dd=0;dd<depth;dd++)
+            apply_xform(cp, xi, p, p, rc);
+         
+         result[outi] = p[0];
+         result[outi+1] = p[1];
+         
+         outi += 2;
+      }
+   }
+}         
+ 
+static void xform_precalc(flam3_genome *cp, int xi) {
+
+   perspective_precalc(&(cp->xform[xi]));
+   juliaN_precalc(&(cp->xform[xi]));
+   juliaScope_precalc(&(cp->xform[xi]));
+   radial_blur_precalc(&(cp->xform[xi]));
+   waves_precalc(&(cp->xform[xi]));
+   disc2_precalc(&(cp->xform[xi]));
+   supershape_precalc(&(cp->xform[xi]));
+   wedgeJulia_precalc(&(cp->xform[xi]));   
+}   
+
 static double adjust_percentage(double in) {
 
    double out;
@@ -2643,6 +2689,49 @@ double flam3_dimension(flam3_genome *cp, int ntries, int clip_to_camera) {
   free(hist);
   return fd;
 }
+
+void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
+
+  int lp,plp;
+  int mycolor;
+  long int default_isaac_seed = (long int)time(0);
+  randctx rc;
+  unsigned short *xform_distrib;
+  double sub_batch[4*SUB_BATCH_SIZE];
+
+  /* Set up the isaac rng */
+  for (lp = 0; lp < RANDSIZ; lp++)
+     rc.randrsl[lp] = default_isaac_seed;
+
+  irandinit(&rc,1);
+  
+  memset(hist,0,256*sizeof(double));
+  
+  for (lp=0;lp<num_batches;lp++) {
+  
+    sub_batch[0] = flam3_random_isaac_11(&rc);
+    sub_batch[1] = flam3_random_isaac_11(&rc);
+    sub_batch[2] = 0;
+    sub_batch[3] = 0;
+
+    // get into the attractor
+    prepare_xform_fn_ptrs(cp,&rc);
+    xform_distrib = flam3_create_xform_distrib(cp);
+    flam3_iterate(cp, SUB_BATCH_SIZE, 20, sub_batch, xform_distrib, &rc);
+    free(xform_distrib);
+    
+    // histogram the colors in the sub_batch array
+    for (plp=0;plp<4*SUB_BATCH_SIZE;plp+=4) {
+      mycolor = (int)(sub_batch[plp+2]*CMAP_SIZE);
+      if (mycolor<0) mycolor=0;
+      if (mycolor>CMAP_SIZE_M1) mycolor=CMAP_SIZE_M1;
+      
+      hist[mycolor] += 1;
+    }
+  }
+} 
+  
+
 
 double flam3_lyapunov(flam3_genome *cp, int ntries) {
   double p[4];
@@ -7367,17 +7456,17 @@ void flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
 
 
 
-typedef double bucket_double[4];
+typedef double bucket_double[5];
 typedef double abucket_double[4];
-typedef unsigned int bucket_int[4];
+typedef unsigned int bucket_int[5];
 typedef unsigned int abucket_int[4];
-typedef unsigned short bucket_short[4];
+typedef unsigned short bucket_short[5];
 typedef unsigned short abucket_short[4];
-typedef float bucket_float[4];
+typedef float bucket_float[5];
 typedef float abucket_float[4];
 
 #ifdef HAVE_GCC_64BIT_ATOMIC_OPS
-extern inline void
+static inline void
 double_atomic_add(double *dest, double delta)
 {
    uint64_t *int_ptr = (uint64_t *)dest;
@@ -7397,7 +7486,7 @@ double_atomic_add(double *dest, double delta)
 #endif /* HAVE_GCC_64BIT_ATOMIC_OPS */
 
 #ifdef HAVE_GCC_ATOMIC_OPS
-extern inline void
+static inline void
 float_atomic_add(float *dest, float delta)
 {
    uint32_t *int_ptr = (uint32_t *)dest;
@@ -7415,7 +7504,7 @@ float_atomic_add(float *dest, float delta)
    } while (!success);
 }
 
-extern inline void
+static inline void
 uint_atomic_add(unsigned int *dest, unsigned int delta)
 {
    unsigned int old_val, new_val;
@@ -7432,7 +7521,7 @@ uint_atomic_add(unsigned int *dest, unsigned int delta)
    } while (!success);
 }
 
-extern inline void
+static inline void
 ushort_atomic_add(unsigned short *dest, unsigned short delta)
 {
    unsigned short old_val, new_val;

@@ -513,6 +513,7 @@ void flam3_copy(flam3_genome *dest, flam3_genome *src);
 void flam3_copyx(flam3_genome *dest, flam3_genome *src, int num_std, int num_final);
 void flam3_copy_params(flam3_xform *dest, flam3_xform *src, int varn);
 
+void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc);
 unsigned short* flam3_create_xform_distrib(flam3_genome *cp);
 void flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_distrib);
 int flam3_check_unity_chaos(flam3_genome *cp);
@@ -552,6 +553,7 @@ flam3_genome *flam3_parse_from_file(FILE *f, char *fn, int default_flag, int *nc
 void flam3_add_symmetry(flam3_genome *g, int sym);
 int flam3_parse_hexformat_colors(char *colstr, flam3_genome *cp, int numcolors, int chan);
 
+void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist);
 void flam3_estimate_bounding_box(flam3_genome *g, double eps, int nsamples,
              double *bmin, double *bmax, randctx *rc);
 void flam3_rotate(flam3_genome *g, double angle, int interp_type); /* angle in degrees */
