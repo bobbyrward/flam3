@@ -652,7 +652,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
 
                      /* Gaussian */
                      de_filt_sum += flam3_spatial_filter(flam3_gaussian_kernel,
-                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d)
+                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d);
 
 //                     /* Epanichnikov */
 //                     de_filt_sum += (1.0 - (de_filt_d * de_filt_d));
@@ -674,6 +674,8 @@ static void render_rectangle(flam3_frame *spec, void *out,
                      /* Gaussian */
                      de_filter_coefs[filter_coef_idx] = flam3_spatial_filter(flam3_gaussian_kernel,
                             flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d)/de_filt_sum; 
+                            
+//                     de_filter_coefs[filter_coef_idx] = adjust_percentage(de_filter_coefs[filter_coef_idx]);
 
 //                     /* Epanichnikov */
 //                     de_filter_coefs[filter_coef_idx] = (1.0 - (de_filt_d * de_filt_d))/de_filt_sum;
