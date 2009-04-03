@@ -216,6 +216,9 @@ int main(int argc, char **argv) {
      fprintf(stderr,"error reading genomes from file\n");
      exit(1);
    }
+   
+   if (inf)
+      fclose(in);
 
    for (i = 0; i < ncps; i++) {
       /* Force ntemporal_samples to 1 for -render */
@@ -388,6 +391,14 @@ int main(int argc, char **argv) {
       else
          fprintf(stderr, "total time = %ld seconds\n", total_time);
    }
+   
+   for (i=0;i<ncps;i++) {
+   
+      clear_cp(&cps[i],0);
+   
+   }
+   free(cps);
+   
    free(image);
    return 0;
 }
