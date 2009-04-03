@@ -1,10 +1,10 @@
 /*
     FLAM3 - cosmic recursive fractal flames
-    Copyright (C) 1992-2006  Scott Draves <source@flam3.com>
+    Copyright (C) 1992-2009 Spotworks LLC
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    the Free Software Foundation; either version 3 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -13,8 +13,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "private.h"
@@ -131,7 +130,7 @@ xmlDocPtr create_new_editdoc(char *action, flam3_genome *parent0, flam3_genome *
    mytime = time(NULL);
    localt = localtime(&mytime);
    /* XXX use standard time format including timezone */
-   strftime(timestring, 100, "%a %b %e %H:%M:%S %Z %Y", localt);
+   strftime(timestring, 100, "%a %b %e %H:%M:%S %z %Y", localt);
    xmlNewProp(root_node, (const xmlChar *)"date", (const xmlChar *)timestring);
 
    /* nick */
@@ -302,8 +301,8 @@ spin(int frame, double blend, flam3_genome *parent, flam3_genome *templ)
 
   xmlFreeDoc(result.edits);
 
-  /* Free the result xform storage */
-  free(result.xform);
+  /* Clear the result cp */
+  clear_cp(&result,flam3_defaults_on);
 }
 
 void spin_inter(int frame, double blend, int seqflag, flam3_genome *parents, flam3_genome *templ) {
@@ -386,11 +385,11 @@ void spin_inter(int frame, double blend, int seqflag, flam3_genome *parents, fla
   xmlFreeDoc(result.edits);
 
   /* Free xform storage */
-  free(spun[0].xform);
-  free(spun[1].xform);
-  free(spun_prealign[0].xform);
-  free(spun_prealign[1].xform);
-  free(result.xform);
+  clear_cp(&spun[0],flam3_defaults_on);
+  clear_cp(&spun[1],flam3_defaults_on);
+  clear_cp(&spun_prealign[0],flam3_defaults_on);
+  clear_cp(&spun_prealign[1],flam3_defaults_on);
+  clear_cp(&result,flam3_defaults_on);
 }
 
 void add_to_action(char *action, char *addtoaction) {
@@ -471,6 +470,7 @@ double try_colors(flam3_genome *g, int color_resolution) {
     g->ntemporal_samples = 1;
 
 //    f.temporal_filter_radius = 0.0;
+   flam3_init_frame(&f);
     f.bits = 32;
     f.bytes_per_channel=1;
     f.verbose = 0;
@@ -479,7 +479,6 @@ double try_colors(flam3_genome *g, int color_resolution) {
     f.pixel_aspect_ratio = 1.0;
     f.progress = 0;
     f.nthreads = 1;
-    irandinit(&f.rc,1);
         
     image = (unsigned char *) calloc(g->width * g->height, 3);
     flam3_render(&f, image, g->width, flam3_field_both, 3, 0, &stats);
@@ -524,7 +523,7 @@ double try_colors(flam3_genome *g, int color_resolution) {
     g->estimator = saved.estimator;
 
     /* Free xform storage */
-    free(saved.xform);
+    clear_cp(&saved,flam3_defaults_on);
 
     return (double) hits / res3;
 }
@@ -560,7 +559,6 @@ void improve_colors(flam3_genome *g, int ntries, int change_palette, int color_r
    flam3_genome best_genome;
 
    memset(&best_genome, 0, sizeof(flam3_genome));
-
    best = try_colors(g, color_resolution);
    flam3_copy(&best_genome,g);
    for (i = 0; i < ntries; i++) {
@@ -572,8 +570,7 @@ void improve_colors(flam3_genome *g, int ntries, int change_palette, int color_r
       }
    }
    flam3_copy(g,&best_genome);
-
-   free(best_genome.xform);
+   clear_cp(&best_genome,flam3_defaults_on);
 }
 
 static void rotate_by(double *p, double *center, double by) {
@@ -695,7 +692,6 @@ main(argc, argv)
    f.progress = 0;
    f.nthreads = num_threads;
    test_cp(&cp_orig);  // just for the width & height
-   image = (unsigned char *) malloc(3 * cp_orig.width * cp_orig.height);
 
    /* Are the variations to be used specified? */
    if (use_vars && dont_use_vars) {
@@ -846,6 +842,7 @@ main(argc, argv)
          gprint(&cp[i], 1);
       }
       printf("</clone_all>\n");
+      
       exit(0);
    }
    
@@ -984,6 +981,7 @@ main(argc, argv)
       double blend, spread;
       char *fname = inter?inter:rotate;
       FILE *fp;
+      int ni;
 
       if (nframes <= 0) {
          fprintf(stderr, "nframes must be positive, not %d.\n", nframes);
@@ -1019,6 +1017,14 @@ main(argc, argv)
          spin_inter(frame + 1, blend + spread, 0, cp, templ);
       }
       if (enclosed) printf("</pick>\n");
+      
+      for (ni=0;ni<ncp;ni++) {
+         xmlFreeDoc(cp[ni].edits);
+         clear_cp(&cp[ni],flam3_defaults_on);
+      }
+      free(cp);
+      
+      fclose(fp);
       exit(0);
    }
 
@@ -1064,6 +1070,7 @@ main(argc, argv)
    }
 
    if (enclosed) printf("<pick version=\"FLAM3-%s\">\n", flam3_version());
+   image = (unsigned char *) malloc(3 * cp_orig.width * cp_orig.height);
 
    for (rep = 0; rep < repeat; rep++) {
      notes[0] = 0;
@@ -1249,7 +1256,7 @@ main(argc, argv)
                   double s = flam3_random01();
                   did_color = 1;
                   // change just the color
-                  if (debug) fprintf(stderr, "mutating color\n");
+                  if (debug) fprintf(stderr, "mutating color\n");                  
                   if (s < 0.4) {
                      improve_colors(&cp_orig, 100, 0, 10);
                      sprintf(action,"mutate color coords");
@@ -1466,8 +1473,8 @@ main(argc, argv)
                   add_to_action(action,ministr);
                   cp_orig.palette_index = rb ? parent1[i1].palette_index : parent0[i0].palette_index;
 
-                  free(parents[0].xform);
-                  free(parents[1].xform);
+                  clear_cp(&parents[0],flam3_defaults_on);
+                  clear_cp(&parents[1],flam3_defaults_on);
 
                } else {
 	       
@@ -1658,6 +1665,7 @@ main(argc, argv)
       /* Free created documents */
       /* (Only free once, since the copy is a ptr to the original) */
       xmlFreeDoc(cp_save.edits);
+      clear_cp(&cp_save,0);
 
       if (verbose) {
          fprintf(stderr, "\ndone.  action = %s\n", action);
@@ -1665,6 +1673,6 @@ main(argc, argv)
 
    }
    if (enclosed) printf("</pick>\n");
-
+   free(image);
    return 0;
 }

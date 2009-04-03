@@ -1,10 +1,10 @@
 /*
-    flam3 - cosmic recursive fractal flames
-    Copyright (C) 1992-2004  Scott Draves <source@flam3.com>
+    FLAM3 - cosmic recursive fractal flames
+    Copyright (C) 1992-2009 Spotworks LLC
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    the Free Software Foundation; either version 3 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -13,10 +13,11 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef private_included
+#define private_included
 
 #include "flam3.h"
 
@@ -86,6 +87,25 @@ typedef struct {
 } flam3_iter_constants;
 
 typedef struct {
+
+   double tx,ty; /* Starting coordinates */
+
+   double precalc_atan, precalc_sina;  /* Precalculated, if needed */
+   double precalc_cosa, precalc_sqrt;
+   double precalc_sumsq,precalc_atanyx;
+
+   flam3_xform *xform; /* For the important values */
+
+   /* Output Coords */
+
+   double p0, p1;
+
+   /* Pointer to the isaac RNG state */
+   randctx *rc;
+
+} flam3_iter_helper;
+
+typedef struct {
    double *iter_storage; /* Storage for iteration coordinates */
    randctx rc; /* Thread-unique ISAAC seed */
    flam3_genome cp; /* Full copy of genome for use by the thread */
@@ -118,3 +138,4 @@ double flam3_spatial_filter(int knum, double x);
 #define  flam3_mitchell_c   (1.0 / 3.0)
 
 
+#endif

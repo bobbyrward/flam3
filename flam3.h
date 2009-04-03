@@ -1,10 +1,10 @@
 /*
     FLAM3 - cosmic recursive fractal flames
-    Copyright (C) 1992-2006  Scott Draves <source@flam3.com>
+    Copyright (C) 1992-2009 Spotworks LLC
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    the Free Software Foundation; either version 3 of the License, or
     (at your option) any later version.
 
     This program is distributed in the hope that it will be useful,
@@ -13,8 +13,7 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 
@@ -506,6 +505,7 @@ typedef struct {
 } flam3_chaos_entry;
 
 /* xform manipulation */
+
 void flam3_add_motion_element(flam3_xform *xf);
 void flam3_add_xforms(flam3_genome *cp, int num_to_add, int interp_padding, int final_flag);
 void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete);
@@ -551,7 +551,6 @@ flam3_genome *flam3_parse_xml2(char *s, char *fn, int default_flag, int *ncps);
 flam3_genome *flam3_parse_from_file(FILE *f, char *fn, int default_flag, int *ncps);
 
 void flam3_add_symmetry(flam3_genome *g, int sym);
-int flam3_parse_hexformat_colors(char *colstr, flam3_genome *cp, int numcolors, int chan);
 
 void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist);
 void flam3_estimate_bounding_box(flam3_genome *g, double eps, int nsamples,

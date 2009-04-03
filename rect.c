@@ -1,20 +1,19 @@
 /*
-   FLAM3 - cosmic recursive fractal flames
-   Copyright (C) 1992-2006  Scott Draves <source@flam3.com>
+    FLAM3 - cosmic recursive fractal flames
+    Copyright (C) 1992-2009 Spotworks LLC
 
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 3 of the License, or
+    (at your option) any later version.
 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /* this file is included into flam3.c once for each buffer bit-width */
@@ -36,12 +35,9 @@
 /* allow this many iterations for settling into attractor */
 #define FUSE 15
 
-/* clamp spatial filter to zero at this std dev (2.5 ~= 0.0125) */
-#define FILTER_CUTOFF 1.8
-
 #define PREFILTER_WHITE 255
 #define WHITE_LEVEL 255
-#define SUB_BATCH_SIZE 10000
+
 
 #if defined(HAVE_LIBPTHREAD) && defined(USE_LOCKS)
   /* mutex for bucket accumulator */
@@ -696,9 +692,10 @@ static void render_rectangle(flam3_frame *spec, void *out,
       
 #if 0
       printf("DE Filters: %d\n",de_max_ind);
-      if (0) { int dej,dek1,dek2,fci;
+      if (1) { int dej,dek1,dek2,fci;
       fci=0;
-      for (dej=0; dej<de_max_ind;dej++) {
+//      for (dej=0; dej<de_max_ind;dej++) {
+      for (dej=0; dej<1;dej++) {
          printf("de_filter_widths[%d] = %f\n",dej,de_filter_widths[dej]);
          for (dek1=0;dek1<=de_half_size;dek1++) {
             for (dek2=0;dek2<=dek1;dek2++) {
