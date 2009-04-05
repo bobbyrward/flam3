@@ -243,7 +243,6 @@ static void iter_thread(void *fth) {
                bump_no_overflow(b[0][2], interpcolor[2]);
                bump_no_overflow(b[0][3], interpcolor[3]);
                bump_no_overflow(b[0][4], 255.0);
-            //fprintf(stderr,"%10.8f %10.8f %10.8f %10.8f\n",b[0][0],b[0][1],b[0][2],b[0][3]);
             } else {
                bump_no_overflow(b[0][0], logvis*interpcolor[0]);
                bump_no_overflow(b[0][1], logvis*interpcolor[1]);
@@ -279,14 +278,11 @@ static void render_rectangle(flam3_frame *spec, void *out,
    double *filter, *temporal_filter, *temporal_deltas, *batch_filter;
    double ppux=0, ppuy=0;
    int image_width, image_height;    /* size of the image to produce */
-   int filter_width;
+   int filter_width=0;
    int bytes_per_channel = spec->bytes_per_channel;
    int oversample = spec->genomes[0].spatial_oversample;
    double highpow = spec->genomes[0].highlight_power;
    int nbatches = spec->genomes[0].nbatches;
-   /* ntemporal_samples ( & nbatches?) should be computed inside the batch
-      loop the same place the DE parms are.  problem is that batches now
-      depends on times.  fix by making all batches happen at the same time */
    int ntemporal_samples = spec->genomes[0].ntemporal_samples;
    flam3_palette dmap;
    int gutter_width;
@@ -297,7 +293,6 @@ static void render_rectangle(flam3_frame *spec, void *out,
    double keep_thresh=100.0;
    time_t progress_timer = 0, progress_began=0;
    int verbose = spec->verbose;
-   char *fname = getenv("image");
    int gnm_idx,max_gnm_de_fw,de_offset;
    flam3_genome cp;
    unsigned short *xform_distrib;
@@ -311,9 +306,11 @@ static void render_rectangle(flam3_frame *spec, void *out,
 #endif
    int thread_status;
    int thi;
-   time_t tstart,tend;
-   
+   time_t tstart,tend;   
    double sumfilt;
+   
+   char *last_block;
+   size_t memory_rqd;
 
    tstart = time(NULL);
 
@@ -325,169 +322,64 @@ static void render_rectangle(flam3_frame *spec, void *out,
    memset(&cp,0, sizeof(flam3_genome));
 
    if (nbatches < 1) {
-       fprintf(stderr, "nbatches must be positive," " not %d.\n", nbatches);
+       fprintf(stderr, "nbatches must be positive, not %d.\n", nbatches);
        exit(1);
    }
 
    if (oversample < 1) {
-       fprintf(stderr, "oversample must be positive," " not %d.\n", oversample);
+       fprintf(stderr, "oversample must be positive, not %d.\n", oversample);
        exit(1);
    }
 
    /* Initialize the thread helper structures */
    fth = (flam3_thread_helper *)calloc(spec->nthreads,sizeof(flam3_thread_helper));
-   for (i=0;i<spec->nthreads;i++) {
+   for (i=0;i<spec->nthreads;i++)
       fth[i].cp.final_xform_index=-1;
-   }
+      
+   /* Set up the output image dimensions, adjusted for scanline */   
    image_width = spec->genomes[0].width;
    if (field) {
       image_height = spec->genomes[0].height / 2;
+      
       if (field == flam3_field_odd)
-    out += nchan * bytes_per_channel * out_width;
+         out += nchan * bytes_per_channel * out_width;
+         
       out_width *= 2;
    } else
       image_height = spec->genomes[0].height;
 
 
    /* Spatial Filter kernel creation */
-
-
-   if (1) {
-   int sf_sel = spec->genomes[0].spatial_filter_select;
-   double sf_supp = flam3_spatial_support[sf_sel];
-   double fw =  (2.0 * sf_supp * oversample *
-         spec->genomes[0].spatial_filter_radius /
-         spec->pixel_aspect_ratio);
-   double adjust;
-
-   filter_width = ((int) fw) + 1;
-   /* make sure it has same parity as oversample */
-   if ((filter_width ^ oversample) & 1)
-      filter_width++;
-
-   if (fw > 0.0)
-      adjust = sf_supp * filter_width / fw;
-   else
-      adjust = 1.0;
-
-#if 0
-   fprintf(stderr, "fw = %g filter_width = %d adjust=%g\n",
-         fw, filter_width, adjust);
-#endif
-
-   filter = (double *) malloc(sizeof(double) * filter_width * filter_width);
-   /* fill in the coefs */
-   for (i = 0; i < filter_width; i++)
-      for (j = 0; j < filter_width; j++) {
-         double ii = ((2.0 * i + 1.0) / filter_width - 1.0)*adjust;
-         double jj = ((2.0 * j + 1.0) / filter_width - 1.0)*adjust;
-
-         if (field) jj *= 2.0;
-
-         jj /= spec->pixel_aspect_ratio;
-
-         filter[i + j * filter_width] = 
-            flam3_spatial_filter(sf_sel,ii) * flam3_spatial_filter(sf_sel,jj);
-      }
-
-
-   if (normalize_vector(filter, filter_width * filter_width)) {
-      fprintf(stderr, "spatial filter value is too small: %g.\n",
-         spec->genomes[0].spatial_filter_radius);
-      exit(1);
-   }
-#if 0
-      printf("vvvvvvvvvvvvvvvvvvvvvvvvvvvv\n");
-      for (j = 0; j < filter_width; j++) {
-    for (i = 0; i < filter_width; i++) {
-      printf(" %5d", (int)(10000 * filter[i + j * filter_width]));
-    }
-    printf("\n");
-      }
-      printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
-      fflush(stdout);
-#endif
-   }
-
-   temporal_filter = (double *) malloc(sizeof(double) * nbatches * ntemporal_samples);
-   temporal_deltas = (double *) malloc(sizeof(double) * nbatches * ntemporal_samples);
-   batch_filter = (double *) malloc(sizeof(double) * nbatches);
-   
-   for (i=0;i<nbatches;i++)
-      batch_filter[i] = 1.0/(double)nbatches;
+   filter_width = flam3_create_spatial_filter(spec, field, &filter);
+   /* note we must free 'filter' at the end */
 
    /* batch filter */
+   /* may want to revisit this at some point */
+   batch_filter = (double *) malloc(sizeof(double) * nbatches);
    for (i=0; i<nbatches; i++)
-      batch_filter[i]=1.0/nbatches;
+      batch_filter[i]=1.0/(double)nbatches;
 
-   if (nbatches*ntemporal_samples > 1) {
+   /* temporal filter - we must free temporal_filter and temporal_deltas at the end */
+   sumfilt = flam3_create_temporal_filter(nbatches*ntemporal_samples, 
+                                          spec->genomes[0].temporal_filter_type,
+                                          spec->genomes[0].temporal_filter_exp,
+                                          spec->genomes[0].temporal_filter_width,
+                                          &temporal_filter, &temporal_deltas);
+                                                                                    
 
-      double nn = nbatches*ntemporal_samples;
-      double maxfilt = 0.0;
-      sumfilt=0.0;
-
-      /* Define temporal deltas from center time */
-      for (i = 0; i < nn; i++)
-            temporal_deltas[i] = (2.0 * ((double) i / (nn - 1)) - 1.0)
-                                  * (spec->genomes[0].temporal_filter_width/2.0);
-
-      /* fill in the coefs */
-      if (flam3_temporal_exp == spec->genomes[0].temporal_filter_type) {
-         for (i = 0; i < nn; i++) {
-            double slpx;
-
-            if (spec->genomes[0].temporal_filter_exp>=0)
-               slpx = ((double)i+1.0)/nn;
-            else
-               slpx = (double)(nn - i)/nn;
-
-            /* Scale the color based on these values */
-            temporal_filter[i] = pow(slpx,fabs(spec->genomes[0].temporal_filter_exp));
-            if (temporal_filter[i]>maxfilt) maxfilt = temporal_filter[i];
-         }
-
-      } else if (flam3_temporal_gaussian == spec->genomes[0].temporal_filter_type) {
-
-         double nn2 = nn/2.0;
-         for (i = 0; i < nn; i++) {
-            temporal_filter[i] = flam3_spatial_filter(flam3_gaussian_kernel,
-                            flam3_spatial_support[flam3_gaussian_kernel]*fabs(i - nn2)/nn2);
-            if (temporal_filter[i]>maxfilt) maxfilt = temporal_filter[i];
-         }
-
-      } else { // (flam3_temporal_box == spec->genomes[0].temporal_filter_type)
-         for (i=0; i<nn; i++) {
-            temporal_filter[i] = 1.0;
-	      }
-	      maxfilt = 1.0;
-      }
-
-      /* Adjust the filter so that the max is 1.0, and */
-      /* calculate the K2 scaling factor  */
-      for (i=0;i<nn;i++) {
-         temporal_filter[i] /= maxfilt;
-         sumfilt += temporal_filter[i];
-      }
-         
-      sumfilt = sumfilt / nn;
-
-   } else {
-      sumfilt = 1.0;
-      temporal_filter[0] = 1.0;
-      temporal_deltas[0] = 0.0;
-   }
-
-   /* the number of additional rows of buckets we put at the edge so
-      that the filter doesn't go off the edge */
-
+   /*
+      the number of additional rows of buckets we put at the edge so
+      that the filter doesn't go off the edge
+   */
    gutter_width = (filter_width - oversample) / 2;
 
-    /* Check the size of the density estimation filter. */
-    /* If the 'radius' of the density estimation filter is greater than the */
-    /* gutter width, we have to pad with more.  Otherwise, we can use the same value. */
+   /* 
+      Check the size of the density estimation filter.
+      If the 'radius' of the density estimation filter is greater than the          
+      gutter width, we have to pad with more.  Otherwise, we can use the same value.
+   */
    max_gnm_de_fw=0;
    for (gnm_idx = 0; gnm_idx < spec->ngenomes; gnm_idx++) {
-
       int this_width = (int)ceil(spec->genomes[gnm_idx].estimator) * oversample;
       if (this_width > max_gnm_de_fw)
          max_gnm_de_fw = this_width;
@@ -500,44 +392,42 @@ static void render_rectangle(flam3_frame *spec, void *out,
    /* max_gnm_de_fw is now the number of pixels of additional gutter      */
    /* necessary to appropriately perform the density estimation filtering */
    /* Check to see if it's greater than the gutter_width                  */
-
    if (max_gnm_de_fw > gutter_width) {
       de_offset = max_gnm_de_fw - gutter_width;
       gutter_width = max_gnm_de_fw;
    } else
       de_offset = 0;
 
+
+   /* Allocate the space required to render the image */
    fic.height = oversample * image_height + 2 * gutter_width;
    fic.width  = oversample * image_width  + 2 * gutter_width;
 
    nbuckets = (long)fic.width * (long)fic.height;
-   if (1) {
-
-     char *last_block = NULL;
-     size_t memory_rqd = (sizeof(bucket) * nbuckets +
-             sizeof(abucket) * nbuckets +
-             4 * sizeof(double) * (size_t)SUB_BATCH_SIZE * spec->nthreads);
-     last_block = (char *) malloc(memory_rqd);
-     if (NULL == last_block) {
-	 fprintf(stderr, "render_rectangle: cannot malloc %g bytes.\n", (double)memory_rqd);
-       fprintf(stderr, "render_rectangle: h=%d w=%d nb=%ld.\n", fic.width, fic.height, nbuckets);
-       exit(1);
-     }
-     /* else fprintf(stderr, "render_rectangle: mallocked %dMb.\n", Mb); */
-
-     buckets = (bucket *) last_block;
-     accumulate = (abucket *) (last_block + sizeof(bucket) * nbuckets);
-     points = (double *)  (last_block + (sizeof(bucket) + sizeof(abucket)) * nbuckets);
+   memory_rqd = (sizeof(bucket) * nbuckets + sizeof(abucket) * nbuckets +
+                 4 * sizeof(double) * (size_t)SUB_BATCH_SIZE * spec->nthreads);
+   last_block = (char *) malloc(memory_rqd);
+   if (NULL == last_block) {
+      fprintf(stderr, "render_rectangle: cannot malloc %g bytes.\n", (double)memory_rqd);
+      fprintf(stderr, "render_rectangle: w=%ld h=%ld nb=%ld.\n", fic.width, fic.height, nbuckets);
+      exit(1);
    }
 
+   /* Just free buckets at the end */   
+   buckets = (bucket *) last_block;
+   accumulate = (abucket *) (last_block + sizeof(bucket) * nbuckets);
+   points = (double *)  (last_block + (sizeof(bucket) + sizeof(abucket)) * nbuckets);
+
    if (verbose) {
-     fprintf(stderr, "chaos: ");
-     progress_began = time(NULL);
+      fprintf(stderr, "chaos: ");
+      progress_began = time(NULL);
    }
 
    background[0] = background[1] = background[2] = 0.0;
    memset((char *) accumulate, 0, sizeof(abucket) * nbuckets);
 
+
+   /* Batch loop - outermost */
    for (batch_num = 0; batch_num < nbatches; batch_num++) {
       double de_time;
       double sample_density=0.0;
@@ -924,6 +814,25 @@ static void render_rectangle(flam3_frame *spec, void *out,
          int ss = (int)floor(oversample / 2.0);
          int scf = !((int)oversample & 1);
          double scfact = pow(oversample/(oversample+1.0), 2.0);
+/*
+         int jhig = fic.height - 2*(oversample-1) + 1;
+         int iwid = fic.width - 2*(oversample-1) + 1;
+         int jblocks = jhig/64 + 1;
+         int iblocks = iwid/64 + 1;
+         int jb,ib;
+         int jo,io;
+         
+         for (jb=0;jb<jblocks;jb++) {
+            jo = (oversample-1) + jb*64;
+            for (ib=0;ib<iblocks;ib++) {
+               io = (oversample-1) + ib*64;
+               
+               for (j=jo;j<jo+64;j++) {
+                  for (i=io;i<io+64;i++) {
+*/                  
+            
+            
+         
          
          /* Density estimation code */
          /* Remember, we already padded with an extra pixel at the beginning */
@@ -936,6 +845,12 @@ static void render_rectangle(flam3_frame *spec, void *out,
                int arr_filt_width;
                bucket *b;
                double c[4],ls;
+               
+//               if (j >= fic.height-(oversample-1))
+//                  continue;
+                  
+//               if (i >= fic.width-(oversample-1))
+//                  continue;
 
                b = buckets + i + j*fic.width;
 
@@ -1024,16 +939,14 @@ static void render_rectangle(flam3_frame *spec, void *out,
                   }
                }
 
-	       if (0) {
-		 abucket *a = accumulate + i + j * fic.width;
-		 a[0][0] = f_select_int;
-	       }
             }
        if (verbose && time(NULL) != progress_timer) {
       progress_timer = time(NULL);
       fprintf(stderr, "\rdensity estimation: %d/%d          ", j, fic.height);
       fflush(stderr);
        }
+//       }
+//       }
 
 
       if (fic.spec->progress) {

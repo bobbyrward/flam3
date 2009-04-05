@@ -394,6 +394,7 @@ int main(int argc, char **argv) {
    
    for (i=0;i<ncps;i++) {
    
+      xmlFreeDoc(cps[i].edits);
       clear_cp(&cps[i],0);
    
    }

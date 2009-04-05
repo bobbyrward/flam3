@@ -581,6 +581,13 @@ typedef struct {
    int           nthreads;
 } flam3_frame;
 
+typedef struct {
+   int max_filtered_counts;
+   int max_filter_index;
+   int kernel_size;
+   double *filter_widths;
+   double *filter_coefs;
+} flam3_de_helper;
 
 #define flam3_field_both  0
 #define flam3_field_even  1
