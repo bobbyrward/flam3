@@ -76,7 +76,6 @@ typedef struct {
    double size[2];
    int width, height; /* buffer width/height */
    double ws0, wb0s0, hs1, hb1s1; /* shortcuts for indexing */
-   int fname_specified; /* Set to 1 if there was a filename specified for colormap */
    flam3_palette_entry *dmap; /* palette */
    double color_scalar; /* <1.0 if non-uniform motion blur is set */
    void *buckets; /* Points to the first accumulator */
