@@ -290,7 +290,6 @@ static void render_rectangle(flam3_frame *spec, void *out,
    double gamma = 0.0;
    double background[3];
    int vib_gam_n = 0;
-   double keep_thresh=100.0;
    time_t progress_timer = 0, progress_began=0;
    int verbose = spec->verbose;
    int gnm_idx,max_gnm_de_fw,de_offset;
@@ -431,13 +430,8 @@ static void render_rectangle(flam3_frame *spec, void *out,
    for (batch_num = 0; batch_num < nbatches; batch_num++) {
       double de_time;
       double sample_density=0.0;
-      int de_row_size, de_kernel_index=0, de_half_size;
-      int de_cutoff_val=0, de_count_limit;
-      double *de_filter_coefs=NULL,*de_filter_widths=NULL;
-      double num_de_filters_d;
-      int num_de_filters=0,filtloop,de_max_ind;
-      double comp_max_radius,comp_min_radius;
       double k1, area, k2;
+      flam3_de_helper de;
 
       de_time = spec->time + temporal_deltas[batch_num*ntemporal_samples];
 
@@ -456,159 +450,34 @@ static void render_rectangle(flam3_frame *spec, void *out,
       }
 
       if (spec->bits <= 32) {
-     if (cp.estimator > 0.0) {
-         fprintf(stderr, "warning: density estimation disabled with %d bit buffers.\n", spec->bits);
-         cp.estimator = 0.0;
-     }
+         if (cp.estimator > 0.0) {
+            fprintf(stderr, "warning: density estimation disabled with %d bit buffers.\n", spec->bits);
+            cp.estimator = 0.0;
+         }
       }
 
+      /* Create DE filters */
       if (cp.estimator > 0.0) {
-
-
-    if (cp.estimator_curve <= 0.0) {
-       fprintf(stderr,"estimator curve must be > 0\n");
-       exit(1);
-    }
-
-         if (cp.estimator < cp.estimator_minimum) {
-            fprintf(stderr,"estimator must be larger than estimator_minimum.\n");
-            fprintf(stderr,"(%f > %f) ? \n",cp.estimator,cp.estimator_minimum);
-            exit(1);
-         }
-
-         /* We should scale the filter width by the oversample          */
-         /* The '+1' comes from the assumed distance to the first pixel */
-         comp_max_radius = cp.estimator*oversample + 1;
-         comp_min_radius = cp.estimator_minimum*oversample + 1;
-
-         /* Calculate how many filter kernels we need based on the decay function */
-         /*                                                                       */
-         /*    num filters = (de_max_width / de_min_width)^(1/estimator_curve)    */
-         /*                                                                       */
-         num_de_filters_d = pow( comp_max_radius/comp_min_radius, (1.0/cp.estimator_curve) );
-         num_de_filters = ceil(num_de_filters_d);
-         
-         /* Condense the smaller kernels to save space */
-         if (num_de_filters>keep_thresh) { 
-            de_max_ind = ceil(keep_thresh + pow(num_de_filters-keep_thresh,cp.estimator_curve))+1;
-            de_count_limit = pow( (double)(de_max_ind-100), 1.0/cp.estimator_curve) + 100;
-         } else {
-            de_max_ind = num_de_filters;
-            de_count_limit = de_max_ind;
-         }
-
-         /* Allocate the memory for these filters */
-         /* and the hit/width lookup vector       */
-         de_row_size = 2*ceil(comp_max_radius)-1;
-         de_half_size = (de_row_size-1)/2;
-         de_kernel_index = (de_half_size+1)*(2+de_half_size)/2;
-
-         de_filter_coefs = (double *) malloc (de_max_ind * de_kernel_index * sizeof(double));
-         de_filter_widths = (double *) malloc (de_max_ind * sizeof(double));
-
-         /* Generate the filter coefficients */
-         de_cutoff_val = 0;
-         for (filtloop=0;filtloop<de_max_ind;filtloop++) {
-
-            double de_filt_sum=0.0, de_filt_d;
-            double de_filt_h;
-            double dej,dek,adjloop;
-            int filter_coef_idx;
-
-            if (filtloop<keep_thresh)
-               de_filt_h = (comp_max_radius / pow(filtloop+1,cp.estimator_curve));
-            else {
-	       adjloop = pow(filtloop-keep_thresh,(1/cp.estimator_curve))+keep_thresh;
-               de_filt_h = (comp_max_radius / pow(adjloop+1,cp.estimator_curve));
-            }
-
-            if (de_filt_h <= comp_min_radius) {
-               de_filt_h = comp_min_radius;
-               de_cutoff_val = filtloop;
-            }
-
-            de_filter_widths[filtloop] = de_filt_h;
-
-            /* Calculate norm of kernel separately (easier) */
-            for (dej=-de_half_size; dej<=de_half_size; dej++) {
-               for (dek=-de_half_size; dek<=de_half_size; dek++) {
-                  de_filt_d = sqrt( (double)(dej*dej+dek*dek) ) / de_filt_h;
-
-                  if (de_filt_d <= 1.0) {
-
-                     /* Gaussian */
-                     de_filt_sum += flam3_spatial_filter(flam3_gaussian_kernel,
-                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d);
-
-//                     /* Epanichnikov */
-//                     de_filt_sum += (1.0 - (de_filt_d * de_filt_d));
-                  }
-               }
-            }
-
-            filter_coef_idx = filtloop*de_kernel_index;
-
-            /* Calculate the unique entries of the kernel */
-            for (dej=0; dej<=de_half_size; dej++) {
-               for (dek=0; dek<=dej; dek++) {
-                  de_filt_d = sqrt( (double)(dej*dej+dek*dek) ) / de_filt_h;
-
-                  if (de_filt_d>1.0)
-                     de_filter_coefs[filter_coef_idx] = 0.0;
-                  else {
-
-                     /* Gaussian */
-                     de_filter_coefs[filter_coef_idx] = flam3_spatial_filter(flam3_gaussian_kernel,
-                            flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d)/de_filt_sum; 
-                            
-//                     de_filter_coefs[filter_coef_idx] = adjust_percentage(de_filter_coefs[filter_coef_idx]);
-
-//                     /* Epanichnikov */
-//                     de_filter_coefs[filter_coef_idx] = (1.0 - (de_filt_d * de_filt_d))/de_filt_sum;
-                  }
-                  
-                  filter_coef_idx ++;
-               }
-            }
-
-            if (de_cutoff_val>0)
-               break;
-         }
-
-         if (de_cutoff_val==0)
-            de_cutoff_val = num_de_filters-1;
-
-      }
+         de = flam3_create_de_filters(cp.estimator,cp.estimator_minimum,
+                                      cp.estimator_curve,oversample);
+      } else
+         de.max_filter_index = 0;
       
-#if 0
-      printf("DE Filters: %d\n",de_max_ind);
-      if (1) { int dej,dek1,dek2,fci;
-      fci=0;
-//      for (dej=0; dej<de_max_ind;dej++) {
-      for (dej=0; dej<1;dej++) {
-         printf("de_filter_widths[%d] = %f\n",dej,de_filter_widths[dej]);
-         for (dek1=0;dek1<=de_half_size;dek1++) {
-            for (dek2=0;dek2<=dek1;dek2++) {
-               printf("%f ",de_filter_coefs[fci++]);
-            }
-            printf("\n");
-         }
-         printf("--------------------------\n");
-      }
-      
-      }
-#endif
+      /* Temporal sample loop */
       for (temporal_sample_num = 0; temporal_sample_num < ntemporal_samples; temporal_sample_num++) {
+
          double temporal_sample_time;
          double color_scalar = temporal_filter[batch_num*ntemporal_samples + temporal_sample_num];
 
          temporal_sample_time = spec->time +
-        temporal_deltas[batch_num*ntemporal_samples + temporal_sample_num];
+            temporal_deltas[batch_num*ntemporal_samples + temporal_sample_num];
 
          /* Interpolate and get a control point */
          flam3_interpolate(spec->genomes, spec->ngenomes, temporal_sample_time, &cp);
 
+         /* Get the xforms ready to render */
          prepare_xform_fn_ptrs(&cp, &spec->rc);
+         xform_distrib = flam3_create_xform_distrib(&cp);
 
          /* compute the colormap entries.                             */
          /* the input colormap is 256 long with entries from 0 to 1.0 */
@@ -663,20 +532,14 @@ static void render_rectangle(flam3_frame *spec, void *out,
 
          }
 
-//         nsamples = sample_density * nbuckets / (oversample * oversample);
+         /* number of samples is based only on the output image size */
          nsamples = sample_density * image_width * image_height;
-#if 0
-         fprintf(stderr, "sample_density=%g nsamples=%g nbuckets=%ld time=%g\n",
-       sample_density, nsamples, nbuckets, temporal_sample_time);
-#endif
-
+         
+         /* how many of these samples are rendered in this loop? */
          batch_size = nsamples / (nbatches * ntemporal_samples);
 
          stats->num_iters += batch_size;
-         
-         /* Set up the xform_distrib array */
-         xform_distrib = flam3_create_xform_distrib(&cp);
-         
+                  
          /* Fill in the iter constants */
          fic.xform_distrib = xform_distrib;
          fic.spec = spec;
@@ -686,14 +549,13 @@ static void render_rectangle(flam3_frame *spec, void *out,
          fic.batch_num = batch_num;
          fic.nbatches = nbatches;
 
-         fic.fname_specified = 0;
          fic.dmap = (flam3_palette_entry *)dmap;
          fic.color_scalar = color_scalar;
          fic.buckets = (void *)buckets;
 
          /* Initialize the thread helper structures */
-         for (thi = 0; thi < spec->nthreads; thi++)
-         {
+         for (thi = 0; thi < spec->nthreads; thi++) {
+
             int rk;
             /* Create a new isaac state for this thread */
             for (rk = 0; rk < RANDSIZ; rk++)
@@ -781,7 +643,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
       printf("k1=%f,k2=%15.12f\n",k1,k2);
 #endif
 
-      if (num_de_filters == 0) {
+      if (de.max_filter_index == 0) {
 
          for (j = 0; j < fic.height; j++) {
             for (i = 0; i < fic.width; i++) {
@@ -870,22 +732,22 @@ static void render_rectangle(flam3_frame *spec, void *out,
                if (scf)
                   f_select *= scfact;
                   
-               if (f_select > de_count_limit)
-                  f_select_int = de_cutoff_val;                  
-               else if (f_select<=keep_thresh)
+               if (f_select > de.max_filtered_counts)
+                  f_select_int = de.max_filter_index;                  
+               else if (f_select<=DE_THRESH)
                   f_select_int = (int)ceil(f_select)-1;
                else
-                  f_select_int = (int)keep_thresh +
-                     (int)floor(pow(f_select-keep_thresh,cp.estimator_curve));
+                  f_select_int = (int)DE_THRESH +
+                     (int)floor(pow(f_select-DE_THRESH,cp.estimator_curve));
 
                /* If the filter selected below the min specified clamp it to the min */
-               if (f_select_int >= de_cutoff_val)
-                  f_select_int = de_cutoff_val;
+               if (f_select_int > de.max_filter_index)
+                  f_select_int = de.max_filter_index;
 
                /* We only have to calculate the values for ~1/8 of the square */
-               f_coef_idx = f_select_int*de_kernel_index;
+               f_coef_idx = f_select_int*de.kernel_size;
 
-               arr_filt_width = (int)ceil(de_filter_widths[f_select_int])-1;
+               arr_filt_width = (int)ceil(de.filter_widths[f_select_int])-1;
 
                b = buckets + i + j*fic.width;
 
@@ -893,7 +755,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
                   for (ii=0; ii<=jj; ii++) {
 
                      /* Skip if coef is 0 */
-                     if (de_filter_coefs[f_coef_idx]==0.0) {
+                     if (de.filter_coefs[f_coef_idx]==0.0) {
                         f_coef_idx++;
                         continue;
                      }
@@ -903,7 +765,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
                      c[2] = (double) b[0][2];
                      c[3] = (double) b[0][3];
 
-                     ls = de_filter_coefs[f_coef_idx]*(k1 * log(1.0 + c[3] * k2))/c[3];
+                     ls = de.filter_coefs[f_coef_idx]*(k1 * log(1.0 + c[3] * k2))/c[3];
 
                      c[0] *= ls;
                      c[1] *= ls;
@@ -963,9 +825,9 @@ static void render_rectangle(flam3_frame *spec, void *out,
 
 
       /* If allocated, free the de filter memory for the next batch */
-      if (num_de_filters > 0) {
-         free(de_filter_coefs);
-         free(de_filter_widths);
+      if (de.max_filter_index > 0) {
+         free(de.filter_coefs);
+         free(de.filter_widths);
       }
 
    }

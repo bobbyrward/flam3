@@ -59,12 +59,14 @@ char *flam3_version() {
 
 #define SUB_BATCH_SIZE     10000
 #define CHOOSE_XFORM_GRAIN 10000
+#define DE_THRESH   50
 
 #define random_distrib(v) ((v)[random()%vlen(v)])
 
 int flam3_create_spatial_filter(flam3_frame *spec, int field, double **filter);
 double flam3_create_temporal_filter(int numsteps, int filter_type, double filter_exp, double filter_width,
                                     double **temporal_filter, double **temporal_deltas);
+flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double curve, int ss);
                                     
                                     
 unsigned short * flam3_create_xform_distrib(flam3_genome *cp) {
@@ -101,86 +103,6 @@ unsigned short * flam3_create_xform_distrib(flam3_genome *cp) {
    return(xform_distrib);
 }
 
-flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double curve, int ss) {
-
-   flam3_de_helper de;
-   double comp_max_radius, comp_min_radius;
-   double num_de_filters_d;
-   int num_de_filters,de_max_ind;
-   int de_row_size, de_half_size, de_kernel_index;
-   int filtloop;
-   int keep_thresh=100;
-
-   if (curve <= 0.0) {
-      fprintf(stderr,"estimator curve must be > 0\n");
-      exit(1);
-   }
-
-   if (max_rad < min_rad) {
-      fprintf(stderr,"estimator must be larger than estimator_minimum.\n");
-      fprintf(stderr,"(%f > %f) ? \n",max_rad,min_rad);
-      exit(1);
-   }
-
-   /* We should scale the filter width by the oversample          */
-   /* The '+1' comes from the assumed distance to the first pixel */
-   comp_max_radius = max_rad*ss + 1;
-   comp_min_radius = min_rad*ss + 1;
-
-   /* Calculate how many filter kernels we need based on the decay function */
-   /*                                                                       */
-   /*    num filters = (de_max_width / de_min_width)^(1/estimator_curve)    */
-   /*                                                                       */
-   num_de_filters_d = pow( comp_max_radius/comp_min_radius, 1.0/curve );
-   num_de_filters = ceil(num_de_filters_d);
-         
-   /* Condense the smaller kernels to save space */
-   if (num_de_filters>keep_thresh) { 
-      de_max_ind = ceil(keep_thresh + pow(num_de_filters-keep_thresh,curve))+1;
-      de.max_filtered_counts = pow( (double)(de_max_ind-100), 1.0/curve) + 100;
-   } else {
-      de_max_ind = num_de_filters;
-      de.max_filtered_counts = de_max_ind;
-   }
-
-   /* Allocate the memory for these filters */
-   /* and the hit/width lookup vector       */
-   de_row_size = 2*ceil(comp_max_radius)-1;
-   de_half_size = (de_row_size-1)/2;
-   de.kernel_size = (de_half_size+1)*(2+de_half_size)/2;
-
-   de.filter_coefs = (double *) malloc (de_max_ind * de.kernel_size * sizeof(double));
-   de.filter_widths = (double *) malloc (de_max_ind * sizeof(double));
-
-   /* Generate the filter coefficients */
-   de.max_filter_index = 0;
-   for (filtloop=0;filtloop<de_max_ind;filtloop++) {
-
-      double de_filt_sum=0.0, de_filt_d;
-      double de_filt_h;
-      double dej,dek,adjloop;
-      double coef;
-      int filter_coef_idx;
-
-      /* Calculate the filter width for this number of hits in a bin */
-      if (filtloop<keep_thresh)
-         de_filt_h = (comp_max_radius / pow(filtloop+1,curve));
-      else {
-         adjloop = pow(filtloop-keep_thresh,(1.0/curve)) + keep_thresh;
-         de_filt_h = (comp_max_radius / pow(adjloop+1,curve));
-      }
-
-      /* Once we've reached the min radius, don't populate any more */
-      if (de_filt_h <= comp_min_radius) {
-         de_filt_h = comp_min_radius;
-         de.max_filter_index = filtloop;
-      }
-
-      de.filter_widths[filtloop] = de_filt_h;
-   }
-   
-   return(de);
-}
 
 int flam3_check_unity_chaos(flam3_genome *cp) {
 
@@ -4123,6 +4045,138 @@ double flam3_create_temporal_filter(int numsteps, int filter_type, double filter
    
    return(sumfilt);
 }                                     
+
+flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double curve, int ss) {
+
+   flam3_de_helper de;
+   double comp_max_radius, comp_min_radius;
+   double num_de_filters_d;
+   int num_de_filters,de_max_ind;
+   int de_row_size, de_half_size, de_kernel_index;
+   int filtloop;
+   int keep_thresh=100;
+
+   if (curve <= 0.0) {
+      fprintf(stderr,"estimator curve must be > 0\n");
+      exit(1);
+   }
+
+   if (max_rad < min_rad) {
+      fprintf(stderr,"estimator must be larger than estimator_minimum.\n");
+      fprintf(stderr,"(%f > %f) ? \n",max_rad,min_rad);
+      exit(1);
+   }
+
+   /* We should scale the filter width by the oversample          */
+   /* The '+1' comes from the assumed distance to the first pixel */
+   comp_max_radius = max_rad*ss + 1;
+   comp_min_radius = min_rad*ss + 1;
+
+   /* Calculate how many filter kernels we need based on the decay function */
+   /*                                                                       */
+   /*    num filters = (de_max_width / de_min_width)^(1/estimator_curve)    */
+   /*                                                                       */
+   num_de_filters_d = pow( comp_max_radius/comp_min_radius, 1.0/curve );
+   num_de_filters = ceil(num_de_filters_d);
+         
+   /* Condense the smaller kernels to save space */
+   if (num_de_filters>keep_thresh) { 
+      de_max_ind = ceil(DE_THRESH + pow(num_de_filters-DE_THRESH,curve))+1;
+      de.max_filtered_counts = pow( (double)(de_max_ind-DE_THRESH), 1.0/curve) + DE_THRESH;
+   } else {
+      de_max_ind = num_de_filters;
+      de.max_filtered_counts = de_max_ind;
+   }
+
+   /* Allocate the memory for these filters */
+   /* and the hit/width lookup vector       */
+   de_row_size = 2*ceil(comp_max_radius)-1;
+   de_half_size = (de_row_size-1)/2;
+   de.kernel_size = (de_half_size+1)*(2+de_half_size)/2;
+
+   de.filter_coefs = (double *) malloc (de_max_ind * de.kernel_size * sizeof(double));
+   de.filter_widths = (double *) malloc (de_max_ind * sizeof(double));
+
+   /* Generate the filter coefficients */
+   de.max_filter_index = 0;
+   for (filtloop=0;filtloop<de_max_ind;filtloop++) {
+
+      double de_filt_sum=0.0, de_filt_d;
+      double de_filt_h;
+      int dej,dek;
+      double adjloop;
+      double coef;
+      int filter_coef_idx;
+
+      /* Calculate the filter width for this number of hits in a bin */
+      if (filtloop<keep_thresh)
+         de_filt_h = (comp_max_radius / pow(filtloop+1,curve));
+      else {
+         adjloop = pow(filtloop-keep_thresh,(1.0/curve)) + keep_thresh;
+         de_filt_h = (comp_max_radius / pow(adjloop+1,curve));
+      }
+
+      /* Once we've reached the min radius, don't populate any more */
+      if (de_filt_h <= comp_min_radius) {
+         de_filt_h = comp_min_radius;
+         de.max_filter_index = filtloop;
+      }
+
+      de.filter_widths[filtloop] = de_filt_h;
+
+      /* Calculate norm of kernel separately (easier) */
+      for (dej=-de_half_size; dej<=de_half_size; dej++) {
+         for (dek=-de_half_size; dek<=de_half_size; dek++) {
+            
+            de_filt_d = sqrt( (double)(dej*dej+dek*dek) ) / de_filt_h;
+
+            /* Only populate the coefs within this radius */
+            if (de_filt_d <= 1.0) {
+
+               /* Gaussian */
+               de_filt_sum += flam3_spatial_filter(flam3_gaussian_kernel,
+                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d);
+
+               /* Epanichnikov */
+//             de_filt_sum += (1.0 - (de_filt_d * de_filt_d));
+            }
+         }
+      }
+
+      filter_coef_idx = filtloop*de.kernel_size;
+
+      /* Calculate the unique entries of the kernel */
+      for (dej=0; dej<=de_half_size; dej++) {
+         for (dek=0; dek<=dej; dek++) {
+            de_filt_d = sqrt( (double)(dej*dej+dek*dek) ) / de_filt_h;
+
+            /* Only populate the coefs within this radius */
+            if (de_filt_d>1.0)
+               de.filter_coefs[filter_coef_idx] = 0.0;
+            else {
+
+               /* Gaussian */
+               de.filter_coefs[filter_coef_idx] = flam3_spatial_filter(flam3_gaussian_kernel,
+                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d)/de_filt_sum; 
+                            
+               /* Epanichnikov */
+//             de_filter_coefs[filter_coef_idx] = (1.0 - (de_filt_d * de_filt_d))/de_filt_sum;
+            }
+                  
+            filter_coef_idx ++;
+         }
+      }
+
+      if (de.max_filter_index>0)
+         break;
+   }
+
+   if (de.max_filter_index==0)
+      de.max_filter_index = de_max_ind-1;
+
+   
+   return(de);
+}
                                   
 void flam3_calc_newrgb(double *cbuf, double ls, double highpow, double *newrgb) {
 
