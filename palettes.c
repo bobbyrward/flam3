@@ -17,12 +17,7 @@
 */
 
 #include "private.h"
-
-typedef struct {
-    int number;
-    char name[flam3_name_len];
-    unsigned char colors[256][3];
-} lib_palette;
+#include "palettes.h"
 
 lib_palette *the_palettes = NULL;
 int npalettes;
@@ -266,6 +261,66 @@ void hsv2rgb(hsv, rgb)
    rgb[1] = gd;
    rgb[2] = bd;
 }
+
+double flam3_calc_alpha(double density, double gamma, double linrange) {
+
+   double dnorm = density;
+   double funcval = pow(linrange, gamma);
+   double frac,alpha;
+   
+   if (dnorm>0) {
+      if (dnorm < linrange) {
+         frac = dnorm/linrange;
+         alpha = (1.0-frac) * dnorm * (funcval / linrange) + frac * pow(dnorm,gamma);
+      } else
+         alpha = pow(dnorm,gamma);
+   } else
+      alpha = 0;
+      
+   return(alpha);
+}
+          
+void flam3_calc_newrgb(double *cbuf, double ls, double highpow, double *newrgb) {
+
+   int rgbi;
+   double newls,lsratio;
+   double newhsv[3];
+   double a, maxa=-1.0, maxc;
+   
+   /* Identify the most saturated channel */
+   for (rgbi=0;rgbi<3;rgbi++) {
+      a = ls * (cbuf[rgbi]/PREFILTER_WHITE);
+      if (a>maxa) {
+         maxa = a;
+         maxc = cbuf[rgbi]/PREFILTER_WHITE;
+      }
+   }
+   
+   /* If a channel is saturated and we have a non-negative highlight power */
+   /* modify the color to prevent hue shift                                */
+   if (maxa>255 && highpow>=0.0) {
+      newls = 255.0/maxc;
+      lsratio = pow(newls/ls,highpow);
+
+      /* Calculate the max-value color (ranged 0 - 1) */
+      for (rgbi=0;rgbi<3;rgbi++)
+         newrgb[rgbi] = newls*(cbuf[rgbi]/PREFILTER_WHITE)/255.0;
+
+      /* Reduce saturation by the lsratio */
+      rgb2hsv(newrgb,newhsv);
+      newhsv[1] *= lsratio;
+      hsv2rgb(newhsv,newrgb);
+
+      for (rgbi=0;rgbi<3;rgbi++)
+         newrgb[rgbi] *= 255.0;
+      
+   } else {
+      for (rgbi=0;rgbi<3;rgbi++)
+         newrgb[rgbi] = ls*(cbuf[rgbi]/PREFILTER_WHITE);
+   }
+}
+
+
 #if 0
 #if 0
 void

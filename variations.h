@@ -21,6 +21,8 @@
 
 #include "private.h"
 
+
+
 /* Variation functions */
 void var0_linear(void *, double);
 void var1_sinusoidal(void *, double);

@@ -35,7 +35,7 @@
 /* allow this many iterations for settling into attractor */
 #define FUSE 15
 
-#define PREFILTER_WHITE 255
+
 #define WHITE_LEVEL 255
 
 
@@ -615,10 +615,10 @@ static void render_rectangle(flam3_frame *spec, void *out,
          /* Free the xform_distrib array */
          free(xform_distrib);
              
-	 if (fic.aborted) {
-	   if (verbose) fprintf(stderr, "\naborted!\n");
-	   goto done;
-	 }
+         if (fic.aborted) {
+            if (verbose) fprintf(stderr, "\naborted!\n");
+            goto done;
+         }
 
          vibrancy += cp.vibrancy;
          gamma += cp.gamma;
@@ -633,7 +633,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
       PREFILTER_WHITE * 268.0 * batch_filter[batch_num]) / 256;
       area = image_width * image_height / (ppux * ppuy);
       k2 = (oversample * oversample * nbatches) /
-   (cp.contrast * area * WHITE_LEVEL * sample_density * sumfilt);
+             (cp.contrast * area * WHITE_LEVEL * sample_density * sumfilt);
 #if 0
       printf("iw=%d,ih=%d,ppux=%f,ppuy=%f\n",image_width,image_height,ppux,ppuy);
       printf("contrast=%f, brightness=%f, PREFILTER=%d, temporal_filter=%f\n",

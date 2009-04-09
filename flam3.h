@@ -157,17 +157,6 @@ extern char *flam3_variation_names[];
 #define VAR_WHORL 80
 #define VAR_WAVES2 81
 
-typedef void (*flam3_iterator)(void *, double);
-
-
-typedef struct {
-
-   char *genome;
-   char *badvals;
-   char *numiters;
-   char *rtime;
-
-} flam3_img_comments;
 
 typedef struct {
 
@@ -488,8 +477,6 @@ typedef struct {
    double hue_rotation1;
    double palette_blend;
 
-//   double motion_exp; /* Motion blur parameter that controls how the colors are scaled */
-
    int temporal_filter_type; /* Temporal filters */
    double temporal_filter_width, temporal_filter_exp;
    
@@ -581,13 +568,6 @@ typedef struct {
    int           nthreads;
 } flam3_frame;
 
-typedef struct {
-   int max_filtered_counts;
-   int max_filter_index;
-   int kernel_size;
-   double *filter_widths;
-   double *filter_coefs;
-} flam3_de_helper;
 
 #define flam3_field_both  0
 #define flam3_field_even  1
@@ -615,36 +595,11 @@ void flam3_init_frame(flam3_frame *f);
 void *flam3_malloc(size_t size);
 void flam3_free(void *ptr);
 
-/* AE Plugin helper functions */
-size_t flam3_size_flattened_genome(flam3_genome *cp);
-void flam3_flatten_genome(flam3_genome *cp, void *buf);
-void flam3_unflatten_genome(void *buf, flam3_genome *cp);
-
 void flam3_srandom();
 
 double flam3_calc_alpha(double density, double gamma, double linrange); 
 void flam3_calc_newrgb(double *cbuf, double ls, double highpow, double *newrgb);
 
-/* Spatial filter kernels */
-#define flam3_gaussian_kernel 0
-#define flam3_hermite_kernel 1
-#define flam3_box_kernel 2
-#define flam3_triangle_kernel 3
-#define flam3_bell_kernel 4
-#define flam3_b_spline_kernel 5
-#define flam3_lanczos3_kernel 6
-#define flam3_lanczos2_kernel 7
-#define flam3_mitchell_kernel 8
-#define flam3_blackman_kernel 9
-#define flam3_catrom_kernel 10
-#define flam3_hamming_kernel 11
-#define flam3_hanning_kernel 12
-#define flam3_quadratic_kernel 13
-
-/* Temporal filters */
-#define flam3_temporal_box 0
-#define flam3_temporal_gaussian 1
-#define flam3_temporal_exp 2
 
 /* Motion function indices */
 #define MOTION_SIN 1

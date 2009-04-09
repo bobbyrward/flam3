@@ -24,6 +24,7 @@
 #include "variations.h"
 #include "interpolation.h"
 #include "parser.h"
+#include "filters.h"
 #include <limits.h>
 #include <math.h>
 #include <stdint.h>
@@ -59,15 +60,9 @@ char *flam3_version() {
 
 #define SUB_BATCH_SIZE     10000
 #define CHOOSE_XFORM_GRAIN 10000
-#define DE_THRESH   50
 
 #define random_distrib(v) ((v)[random()%vlen(v)])
-
-int flam3_create_spatial_filter(flam3_frame *spec, int field, double **filter);
-double flam3_create_temporal_filter(int numsteps, int filter_type, double filter_exp, double filter_width,
-                                    double **temporal_filter, double **temporal_deltas);
-flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double curve, int ss);
-                                    
+                                   
                                     
 unsigned short * flam3_create_xform_distrib(flam3_genome *cp) {
 
@@ -288,119 +283,6 @@ void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, in
    }
 }         
 
-/* correlation dimension, after clint sprott.
-   computes slope of the correlation sum at a size scale
-   the order of 2% the size of the attractor or the camera. */
-double flam3_dimension(flam3_genome *cp, int ntries, int clip_to_camera) {
-  double fd;
-  double *hist;
-  double bmin[2];
-  double bmax[2];
-  double d2max;
-  int lp;
-  long int default_isaac_seed = (long int)time(0);
-  randctx rc;
-  int i, n1=0, n2=0, got, nclipped;
-
-  /* Set up the isaac rng */
-  for (lp = 0; lp < RANDSIZ; lp++)
-     rc.randrsl[lp] = default_isaac_seed;
-
-  irandinit(&rc,1);
-
-  if (ntries < 2) ntries = 3000*1000;
-
-  if (clip_to_camera) {
-    double scale, ppux, corner0, corner1;
-    scale = pow(2.0, cp->zoom);
-    ppux = cp->pixels_per_unit * scale;
-    corner0 = cp->center[0] - cp->width / ppux / 2.0;
-    corner1 = cp->center[1] - cp->height / ppux / 2.0;
-    bmin[0] = corner0;
-    bmin[1] = corner1;
-    bmax[0] = corner0 + cp->width  / ppux;
-    bmax[1] = corner1 + cp->height / ppux;
-  } else {
-    flam3_estimate_bounding_box(cp, 0.0, 0, bmin, bmax, &rc);
-  }
-
-  d2max =
-    (bmax[0] - bmin[0]) * (bmax[0] - bmin[0]) +
-    (bmax[1] - bmin[1]) * (bmax[1] - bmin[1]);
-
-  //  fprintf(stderr, "d2max=%g %g %g %g %g\n", d2max,
-  //  bmin[0], bmin[1], bmax[0], bmax[1]);
-
-  hist = malloc(2 * ntries * sizeof(double));
-
-  got = 0;
-  nclipped = 0;
-  while (got < 2*ntries) {
-    double subb[4*SUB_BATCH_SIZE];
-    int i4, clipped;
-    unsigned short *xform_distrib;
-    subb[0] = flam3_random_isaac_11(&rc);
-    subb[1] = flam3_random_isaac_11(&rc);
-    subb[2] = 0.0;
-    subb[3] = 0.0;
-    prepare_xform_fn_ptrs(cp,&rc);
-    xform_distrib = flam3_create_xform_distrib(cp);
-    flam3_iterate(cp, SUB_BATCH_SIZE, 20, subb, xform_distrib, &rc);
-    free(xform_distrib);
-    i4 = 0;
-    for (i = 0; i < SUB_BATCH_SIZE; i++) {
-      if (got == 2*ntries) break;
-      clipped = clip_to_camera &&
-   ((subb[i4] < bmin[0]) ||
-    (subb[i4+1] < bmin[1]) ||
-    (subb[i4] > bmax[0]) ||
-    (subb[i4+1] > bmax[1]));
-      if (!clipped) {
-   hist[got] = subb[i4];
-   hist[got+1] = subb[i4+1];
-   got += 2;
-      } else {
-   nclipped++;
-   if (nclipped > 10 * ntries) {
-       fprintf(stderr, "warning: too much clipping, "
-          "flam3_dimension giving up.\n");
-       return sqrt(-1.0);
-   }
-      }
-      i4 += 4;
-    }
-  }
-  if (0)
-    fprintf(stderr, "cliprate=%g\n", nclipped/(ntries+(double)nclipped));
-
-  for (i = 0; i < ntries; i++) {
-    int ri;
-    double dx, dy, d2;
-    double tx, ty;
-
-    tx = hist[2*i];
-    ty = hist[2*i+1];
-
-    do {
-      ri = 2 * (random() % ntries);
-    } while (ri == i);
-
-    dx = hist[ri] - tx;
-    dy = hist[ri+1] - ty;
-    d2 = dx*dx + dy*dy;
-    if (d2 < 0.004 * d2max) n2++;
-    if (d2 < 0.00004 * d2max) n1++;
-  }
-
-  fd = 0.434294 * log(n2 / (n1 - 0.5));
-
-  if (0)
-    fprintf(stderr, "n1=%d n2=%d\n", n1, n2);
-
-  free(hist);
-  return fd;
-}
-
 void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
 
   int lp,plp;
@@ -443,91 +325,6 @@ void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
 } 
   
 
-
-double flam3_lyapunov(flam3_genome *cp, int ntries) {
-  double p[4];
-  double x, y;
-  double xn, yn;
-  double xn2, yn2;
-  double dx, dy, r;
-  double eps = 1e-5;
-  int i;
-  double sum = 0.0;
-  unsigned short *xform_distrib;
-
-  int lp;
-  long int default_isaac_seed = (long int)time(0);
-  randctx rc;
-
-  /* Set up the isaac rng */
-  for (lp = 0; lp < RANDSIZ; lp++)
-     rc.randrsl[lp] = default_isaac_seed;
-
-  irandinit(&rc,1);
-
-
-  if (ntries < 1) ntries = 10000;
-
-  for (i = 0; i < ntries; i++) {
-    x = flam3_random_isaac_11(&rc);
-    y = flam3_random_isaac_11(&rc);
-
-    p[0] = x;
-    p[1] = y;
-    p[2] = 0.0;
-    p[3] = 0.0;
-
-    // get into the attractor
-    prepare_xform_fn_ptrs(cp,&rc);
-    xform_distrib = flam3_create_xform_distrib(cp);
-    flam3_iterate(cp, 1, 20+(random()%10), p, xform_distrib, &rc);
-    free(xform_distrib);
-
-    x = p[0];
-    y = p[1];
-
-    // take one deterministic step
-    srandom(i);
-
-    prepare_xform_fn_ptrs(cp,&rc);
-    xform_distrib = flam3_create_xform_distrib(cp);
-    flam3_iterate(cp, 1, 0, p, xform_distrib, &rc);
-    free(xform_distrib);
-
-    xn = p[0];
-    yn = p[1];
-
-    do {
-      dx = flam3_random_isaac_11(&rc);
-      dy = flam3_random_isaac_11(&rc);
-      r = sqrt(dx * dx + dy * dy);
-    } while (r == 0.0);
-    dx /= r;
-    dy /= r;
-
-    dx *= eps;
-    dy *= eps;
-
-    p[0] = x + dx;
-    p[1] = y + dy;
-    p[2] = 0.0;
-
-    // take the same step but with eps
-    srandom(i);
-    prepare_xform_fn_ptrs(cp,&rc);
-    xform_distrib = flam3_create_xform_distrib(cp);
-    flam3_iterate(cp, 1, 0, p, xform_distrib, &rc);
-    free(xform_distrib);
-
-    xn2 = p[0];
-    yn2 = p[1];
-
-    r = sqrt((xn-xn2)*(xn-xn2) + (yn-yn2)*(yn-yn2));
-
-    sum += log(r/eps);
-  }
-  return sum/(log(2.0)*ntries);
-}
 
 /* BY is angle in degrees */
 void flam3_rotate(flam3_genome *cp, double by, int interpolation_type) {
@@ -1558,7 +1355,8 @@ void flam3_copyx(flam3_genome *dest, flam3_genome *src, int dest_std_xforms, int
          if (src->xform[i].num_motion>0) {
             for (j=0;j<src->xform[i].num_motion;j++)
                flam3_add_motion_element(&dest->xform[dest->num_xforms-1]);
-            memcpy(dest->xform[dest->num_xforms-1].motion,src->xform[i].motion,src->xform[i].num_motion*sizeof(flam3_xform));
+            memcpy(dest->xform[dest->num_xforms-1].motion,src->xform[i].motion,
+                   src->xform[i].num_motion*sizeof(flam3_xform));
          }
          
       } else {
@@ -1680,61 +1478,6 @@ void clear_cp(flam3_genome *cp, int default_flag) {
     cp->final_xform_index = -1;
 
 }
-
-static double flam3_spatial_support[flam3_num_spatialfilters] = {
-
-   1.5, /* gaussian */
-   1.0, /* hermite */
-   0.5, /* box */
-   1.0, /* triangle */
-   1.5, /* bell */
-   2.0, /* b spline */
-   2.0, /* mitchell */
-   1.0, /* blackman */
-   2.0, /* catrom */
-   1.0, /* hanning */
-   1.0, /* hamming */
-   3.0, /* lanczos3 */
-   2.0, /* lanczos2 */
-   1.5  /* quadratic */
-};
-
-double flam3_spatial_filter(int knum, double x) {
-
-   if (knum==0)
-      return flam3_gaussian_filter(x);
-   else if (knum==1)
-      return flam3_hermite_filter(x);
-   else if (knum==2)
-      return flam3_box_filter(x);
-   else if (knum==3)
-      return flam3_triangle_filter(x);
-   else if (knum==4)
-      return flam3_bell_filter(x);
-   else if (knum==5)
-      return flam3_b_spline_filter(x);
-   else if (knum==6)
-      return flam3_mitchell_filter(x);
-   else if (knum==7)
-      return flam3_sinc(x)*flam3_blackman_filter(x);
-   else if (knum==8)
-      return flam3_catrom_filter(x);
-   else if (knum==9)
-      return flam3_sinc(x)*flam3_hanning_filter(x);
-   else if (knum==10)
-      return flam3_sinc(x)*flam3_hamming_filter(x);
-   else if (knum==11)
-      return flam3_lanczos3_filter(x)*flam3_sinc(x/3.0);   
-   else if (knum==12)
-      return flam3_lanczos2_filter(x)*flam3_sinc(x/2.0);
-   else if (knum==13)
-      return flam3_quadratic_filter(x);
-   else {
-      fprintf(stderr,"Unknown filter kernel %d!\n",knum);
-      exit(1);
-   }
-}
-
 
 
 int flam3_count_nthreads(void) {
@@ -1898,142 +1641,6 @@ flam3_genome * flam3_parse_from_file(FILE *f, char *fname, int default_flag, int
 
 }
 
-static void flam3_edit_print(FILE *f, xmlNodePtr editNode, int tabs, int formatting) {
-
-   char *tab_string = "   ";
-   int ti,strl;
-   xmlAttrPtr att_ptr=NULL,cur_att=NULL;
-   xmlNodePtr chld_ptr=NULL, cur_chld=NULL;
-   int edit_or_sheep = 0, indent_printed = 0;
-   char *ai;
-   int tablim = argi("print_edit_depth",0);
-
-   char *att_str,*cont_str,*cpy_string;
-
-   if (tablim>0 && tabs>tablim)
-   return;
-
-   /* If this node is an XML_ELEMENT_NODE, print it and it's attributes */
-   if (editNode->type==XML_ELEMENT_NODE) {
-
-      /* Print the node at the tab specified */
-      if (formatting) {
-         for (ti=0;ti<tabs;ti++)
-            fprintf(f,"%s",tab_string);
-      }
-
-      fprintf(f,"<%s",editNode->name);
-
-      /* This can either be an edit node or a sheep node */
-      /* If it's an edit node, add one to the tab        */
-      if (!xmlStrcmp(editNode->name, (const xmlChar *)"edit")) {
-         edit_or_sheep = 1;
-         tabs ++;
-      } else if (!xmlStrcmp(editNode->name, (const xmlChar *)"sheep"))
-         edit_or_sheep = 2;
-      else
-         edit_or_sheep = 0;
-
-
-      /* Print the attributes */
-      att_ptr = editNode->properties;
-
-      for (cur_att = att_ptr; cur_att; cur_att = cur_att->next) {
-
-         att_str = (char *) xmlGetProp(editNode,cur_att->name);
-         fprintf(f," %s=\"%s\"",cur_att->name,att_str);
-         xmlFree(att_str);
-      }
-
-      /* Does this node have children? */
-      if (!editNode->children || (tablim>0 && tabs>tablim)) {
-         /* Close the tag and subtract the tab */
-         fprintf(f,"/>");
-         if (formatting)
-            fprintf(f,"\n");
-         tabs--;
-      } else {
-
-         /* Close the tag */
-         fprintf(f,">");
-
-         if (formatting)
-            fprintf(f,"\n");
-
-         /* Loop through the children and print them */
-         chld_ptr = editNode->children;
-
-         indent_printed = 0;
-
-         for (cur_chld=chld_ptr; cur_chld; cur_chld = cur_chld->next) {
-
-            /* If child is an element, indent first and then print it. */
-            if (cur_chld->type==XML_ELEMENT_NODE &&
-               (!xmlStrcmp(cur_chld->name, (const xmlChar *)"edit") ||
-      (!xmlStrcmp(cur_chld->name, (const xmlChar *)"sheep")))) {
-
-               if (indent_printed) {
-                  indent_printed = 0;
-                  fprintf(f,"\n");
-               }
-
-               flam3_edit_print(f, cur_chld, tabs, 1);
-
-            } else {
-
-               /* Child is a text node.  We don't want to indent more than once. */
-               if (xmlIsBlankNode(cur_chld))
-                  continue;
-
-               if (indent_printed==0 && formatting==1) {
-                  for (ti=0;ti<tabs;ti++)
-                     fprintf(f,"%s",tab_string);
-                  indent_printed = 1;
-               }
-
-               /* Print nodes without formatting. */
-               flam3_edit_print(f, cur_chld, tabs, 0);
-
-            }
-         }
-
-         if (indent_printed && formatting)
-            fprintf(f,"\n");
-
-         /* Tab out. */
-         tabs --;
-         if (formatting) {
-            for (ti=0;ti<tabs;ti++)
-               fprintf(f,"%s",tab_string);
-         }
-
-         /* Close the tag */
-         fprintf(f,"</%s>",editNode->name);
-
-         if (formatting) {
-            fprintf(f,"\n");
-         }
-      }
-
-   } else if (editNode->type==XML_TEXT_NODE) {
-
-      /* Print text node */
-      cont_str = (char *) xmlNodeGetContent(editNode);
-      cpy_string = &(cont_str[0]);
-      while (isspace(*cpy_string))
-         cpy_string++;
-
-      strl = (int)strlen(cont_str)-1;
-
-      while (isspace(cont_str[strl]))
-         strl--;
-
-      cont_str[strl+1] = 0;
-
-      fprintf(f,"%s",cpy_string);
-
-   }
-}
 
 void flam3_apply_template(flam3_genome *cp, flam3_genome *templ) {
 
@@ -2650,22 +2257,6 @@ int flam3_random_isaac_bit(randctx *ct) {
    int tmp = irand(ct);
    return tmp & 1;
 }
-
-
-/* sum of entries of vector to 1 */
-static int normalize_vector(double *v, int n) {
-   double t = 0.0;
-   int i;
-   for (i = 0; i < n; i++)
-      t += v[i];
-   if (0.0 == t) return 1;
-   t = 1.0 / t;
-   for (i = 0; i < n; i++)
-      v[i] *= t;
-   return 0;
-}
-
-
 
 static double round6(double x) {
   x *= 1e6;
@@ -3636,247 +3227,6 @@ void flam3_render(flam3_frame *spec, void *out,
   }
 }
 
-/*
- *   filter function definitions
- * from Graphics Gems III code
- * and ImageMagick resize.c
- */
-
-double flam3_hermite_filter(double t) {
-   /* f(t) = 2|t|^3 - 3|t|^2 + 1, -1 <= t <= 1 */
-   if(t < 0.0) t = -t;
-   if(t < 1.0) return((2.0 * t - 3.0) * t * t + 1.0);
-   return(0.0);
-}
-
-double flam3_box_filter(double t) {
-   if((t > -0.5) && (t <= 0.5)) return(1.0);
-   return(0.0);
-}
-
-double flam3_triangle_filter(double t) {
-   if(t < 0.0) t = -t;
-   if(t < 1.0) return(1.0 - t);
-   return(0.0);
-}
-
-double flam3_bell_filter(double t) {
-   /* box (*) box (*) box */
-   if(t < 0) t = -t;
-   if(t < .5) return(.75 - (t * t));
-   if(t < 1.5) {
-      t = (t - 1.5);
-      return(.5 * (t * t));
-   }
-   return(0.0);
-}
-
-double flam3_b_spline_filter(double t) {
-
-   /* box (*) box (*) box (*) box */
-   double tt;
-
-   if(t < 0) t = -t;
-   if(t < 1) {
-      tt = t * t;
-      return((.5 * tt * t) - tt + (2.0 / 3.0));
-   } else if(t < 2) {
-      t = 2 - t;
-      return((1.0 / 6.0) * (t * t * t));
-   }
-   return(0.0);
-}
-
-double flam3_sinc(double x) {
-   x *= M_PI;
-   if(x != 0) return(sin(x) / x);
-   return(1.0);
-}
-
-double flam3_blackman_filter(double x) {
-  return(0.42+0.5*cos(M_PI*x)+0.08*cos(2*M_PI*x));
-}
-
-double flam3_catrom_filter(double x) {
-  if (x < -2.0)
-    return(0.0);
-  if (x < -1.0)
-    return(0.5*(4.0+x*(8.0+x*(5.0+x))));
-  if (x < 0.0)
-    return(0.5*(2.0+x*x*(-5.0-3.0*x)));
-  if (x < 1.0)
-    return(0.5*(2.0+x*x*(-5.0+3.0*x)));
-  if (x < 2.0)
-    return(0.5*(4.0+x*(-8.0+x*(5.0-x))));
-  return(0.0);
-}
-
-double flam3_mitchell_filter(double t) {
-   double tt;
-
-   tt = t * t;
-   if(t < 0) t = -t;
-   if(t < 1.0) {
-      t = (((12.0 - 9.0 * flam3_mitchell_b - 6.0 * flam3_mitchell_c) * (t * tt))
-         + ((-18.0 + 12.0 * flam3_mitchell_b + 6.0 * flam3_mitchell_c) * tt)
-         + (6.0 - 2 * flam3_mitchell_b));
-      return(t / 6.0);
-   } else if(t < 2.0) {
-      t = (((-1.0 * flam3_mitchell_b - 6.0 * flam3_mitchell_c) * (t * tt))
-         + ((6.0 * flam3_mitchell_b + 30.0 * flam3_mitchell_c) * tt)
-         + ((-12.0 * flam3_mitchell_b - 48.0 * flam3_mitchell_c) * t)
-         + (8.0 * flam3_mitchell_b + 24 * flam3_mitchell_c));
-      return(t / 6.0);
-   }
-   return(0.0);
-}
-
-double flam3_hanning_filter(double x) {
-  return(0.5+0.5*cos(M_PI*x));
-}
-
-double flam3_hamming_filter(double x) {
-  return(0.54+0.46*cos(M_PI*x));
-}
-
-double flam3_lanczos3_filter(double t) {
-   if(t < 0) t = -t;
-   if(t < 3.0) return(flam3_sinc(t) * flam3_sinc(t/3.0));
-   return(0.0);
-}
-
-double flam3_lanczos2_filter(double t) {
-   if(t < 0) t = -t;
-   if(t < 2.0) return(flam3_sinc(t) * flam3_sinc(t/2.0));
-   return(0.0);
-}
-
-double flam3_gaussian_filter(double x) {
-  return(exp((-2.0*x*x))*sqrt(2.0/M_PI));
-}
-
-double flam3_quadratic_filter(double x) {
-  if (x < -1.5)
-    return(0.0);
-  if (x < -0.5)
-    return(0.5*(x+1.5)*(x+1.5));
-  if (x < 0.5)
-    return(0.75-x*x);
-  if (x < 1.5)
-    return(0.5*(x-1.5)*(x-1.5));
-  return(0.0);
-}
-
-void b64decode(char* instr, char *outstr)
-{
-    char *cur, *start;
-    int d, dlast, phase;
-    char c;
-    static int table[256] = {
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 00-0F */
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 10-1F */
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,  /* 20-2F */
-        52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,  /* 30-3F */
-        -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,  /* 40-4F */
-        15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,  /* 50-5F */
-        -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,  /* 60-6F */
-        41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,  /* 70-7F */
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 80-8F */
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 90-9F */
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* A0-AF */
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* B0-BF */
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* C0-CF */
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* D0-DF */
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* E0-EF */
-        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1   /* F0-FF */
-    };
-
-    d = dlast = phase = 0;
-    start = instr;
-    for (cur = instr; *cur != '\0'; ++cur )
-    {
-   // jer: this is my bit that treats line endings as physical breaks
-   if(*cur == '\n' || *cur == '\r'){phase = dlast = 0; continue;}
-        d = table[(int)*cur];
-        if(d != -1)
-        {
-            switch(phase)
-            {
-            case 0:
-                ++phase;
-                break;
-            case 1:
-                c = ((dlast << 2) | ((d & 0x30) >> 4));
-                *outstr++ = c;
-                ++phase;
-                break;
-            case 2:
-                c = (((dlast & 0xf) << 4) | ((d & 0x3c) >> 2));
-                *outstr++ = c;
-                ++phase;
-                break;
-            case 3:
-                c = (((dlast & 0x03 ) << 6) | d);
-                *outstr++ = c;
-                phase = 0;
-                break;
-            }
-            dlast = d;
-        }
-    }
-}
-
-/* Helper functions for After Effects Plugin */
-/* Function to calculate the size of a 'flattened' genome (required by AE API) */
-size_t flam3_size_flattened_genome(flam3_genome *cp) {
-
-   size_t flatsize;
-   
-   flatsize = sizeof(flam3_genome);
-   flatsize += cp->num_xforms * sizeof(flam3_xform);
-   
-   return(flatsize);
-}
-
-/* Function to flatten the contents of a genome into a buffer */
-void flam3_flatten_genome(flam3_genome *cp, void *buf) {
-
-   int i;
-   char *bufoff;
-
-   /* Copy genome first */
-   memcpy(buf, (const void *)cp, sizeof(flam3_genome));
-   
-   /* Copy the xforms */
-   bufoff = (char *)buf + sizeof(flam3_genome);
-   for (i=0; i<cp->num_xforms; i++) {
-      memcpy(bufoff, (const void *)(&cp->xform[i]), sizeof(flam3_xform));
-      bufoff += sizeof(flam3_xform);
-   }
-}
-
-/* Function to unflatten a genome buffer */
-void flam3_unflatten_genome(void *buf, flam3_genome *cp) {
-
-   int i;
-   char *bufoff;
-   
-   /* Copy out the genome */
-   memcpy((void *)cp, (const void *)buf, sizeof(flam3_genome));
-   
-   /* Allocate space for the xforms */
-   cp->xform = (flam3_xform *)malloc(cp->num_xforms * sizeof(flam3_xform));
-   
-   /* Initialize the xforms (good habit to be in) */
-   initialize_xforms(cp, 0);
-   
-   /* Copy out the xforms from the buffer */
-   bufoff = (char *)buf + sizeof(flam3_genome);
-   for (i=0; i<cp->num_xforms; i++) {
-      memcpy(bufoff, (const void *)(&cp->xform[i]), sizeof(flam3_xform));
-      bufoff += sizeof(flam3_xform);
-   }
-}
 
 void flam3_srandom() {
    unsigned int seed;
@@ -3890,330 +3240,202 @@ void flam3_srandom() {
    srandom(seed);
 }
 
-double flam3_calc_alpha(double density, double gamma, double linrange) {
 
-   double dnorm = density;
-   double funcval = pow(linrange, gamma);
-   double frac,alpha;
-   
-   if (dnorm>0) {
-      if (dnorm < linrange) {
-         frac = dnorm/linrange;
-         alpha = (1.0-frac) * dnorm * (funcval / linrange) + frac * pow(dnorm,gamma);
-      } else
-         alpha = pow(dnorm,gamma);
-   } else
-      alpha = 0;
-      
-   return(alpha);
+/* correlation dimension, after clint sprott.
+   computes slope of the correlation sum at a size scale
+   the order of 2% the size of the attractor or the camera. */
+double flam3_dimension(flam3_genome *cp, int ntries, int clip_to_camera) {
+  double fd;
+  double *hist;
+  double bmin[2];
+  double bmax[2];
+  double d2max;
+  int lp;
+  long int default_isaac_seed = (long int)time(0);
+  randctx rc;
+  int i, n1=0, n2=0, got, nclipped;
+
+  /* Set up the isaac rng */
+  for (lp = 0; lp < RANDSIZ; lp++)
+     rc.randrsl[lp] = default_isaac_seed;
+
+  irandinit(&rc,1);
+
+  if (ntries < 2) ntries = 3000*1000;
+
+  if (clip_to_camera) {
+    double scale, ppux, corner0, corner1;
+    scale = pow(2.0, cp->zoom);
+    ppux = cp->pixels_per_unit * scale;
+    corner0 = cp->center[0] - cp->width / ppux / 2.0;
+    corner1 = cp->center[1] - cp->height / ppux / 2.0;
+    bmin[0] = corner0;
+    bmin[1] = corner1;
+    bmax[0] = corner0 + cp->width  / ppux;
+    bmax[1] = corner1 + cp->height / ppux;
+  } else {
+    flam3_estimate_bounding_box(cp, 0.0, 0, bmin, bmax, &rc);
+  }
+
+  d2max =
+    (bmax[0] - bmin[0]) * (bmax[0] - bmin[0]) +
+    (bmax[1] - bmin[1]) * (bmax[1] - bmin[1]);
+
+  //  fprintf(stderr, "d2max=%g %g %g %g %g\n", d2max,
+  //  bmin[0], bmin[1], bmax[0], bmax[1]);
+
+  hist = malloc(2 * ntries * sizeof(double));
+
+  got = 0;
+  nclipped = 0;
+  while (got < 2*ntries) {
+    double subb[4*SUB_BATCH_SIZE];
+    int i4, clipped;
+    unsigned short *xform_distrib;
+    subb[0] = flam3_random_isaac_11(&rc);
+    subb[1] = flam3_random_isaac_11(&rc);
+    subb[2] = 0.0;
+    subb[3] = 0.0;
+    prepare_xform_fn_ptrs(cp,&rc);
+    xform_distrib = flam3_create_xform_distrib(cp);
+    flam3_iterate(cp, SUB_BATCH_SIZE, 20, subb, xform_distrib, &rc);
+    free(xform_distrib);
+    i4 = 0;
+    for (i = 0; i < SUB_BATCH_SIZE; i++) {
+      if (got == 2*ntries) break;
+      clipped = clip_to_camera &&
+   ((subb[i4] < bmin[0]) ||
+    (subb[i4+1] < bmin[1]) ||
+    (subb[i4] > bmax[0]) ||
+    (subb[i4+1] > bmax[1]));
+      if (!clipped) {
+   hist[got] = subb[i4];
+   hist[got+1] = subb[i4+1];
+   got += 2;
+      } else {
+   nclipped++;
+   if (nclipped > 10 * ntries) {
+       fprintf(stderr, "warning: too much clipping, "
+          "flam3_dimension giving up.\n");
+       return sqrt(-1.0);
+   }
+      }
+      i4 += 4;
+    }
+  }
+  if (0)
+    fprintf(stderr, "cliprate=%g\n", nclipped/(ntries+(double)nclipped));
+
+  for (i = 0; i < ntries; i++) {
+    int ri;
+    double dx, dy, d2;
+    double tx, ty;
+
+    tx = hist[2*i];
+    ty = hist[2*i+1];
+
+    do {
+      ri = 2 * (random() % ntries);
+    } while (ri == i);
+
+    dx = hist[ri] - tx;
+    dy = hist[ri+1] - ty;
+    d2 = dx*dx + dy*dy;
+    if (d2 < 0.004 * d2max) n2++;
+    if (d2 < 0.00004 * d2max) n1++;
+  }
+
+  fd = 0.434294 * log(n2 / (n1 - 0.5));
+
+  if (0)
+    fprintf(stderr, "n1=%d n2=%d\n", n1, n2);
+
+  free(hist);
+  return fd;
 }
 
-int flam3_create_spatial_filter(flam3_frame *spec, int field, double **filter) {
+double flam3_lyapunov(flam3_genome *cp, int ntries) {
+  double p[4];
+  double x, y;
+  double xn, yn;
+  double xn2, yn2;
+  double dx, dy, r;
+  double eps = 1e-5;
+  int i;
+  double sum = 0.0;
+  unsigned short *xform_distrib;
 
-   int sf_kernel = spec->genomes[0].spatial_filter_select;
-   int supersample = spec->genomes[0].spatial_oversample;
-   double sf_radius = spec->genomes[0].spatial_filter_radius;
-   double aspect_ratio = spec->pixel_aspect_ratio;   
-   double sf_supp = flam3_spatial_support[sf_kernel];
-   
-   double fw = 2.0 * sf_supp * supersample * sf_radius / aspect_ratio;
-   double adjust, ii, jj;
-   
-   int fwidth = ((int) fw) + 1;
-   int i,j;
-   
-   
-   /* Make sure the filter kernel has same parity as oversample */
-   if ((fwidth ^ supersample) & 1)
-      fwidth++;
+  int lp;
+  long int default_isaac_seed = (long int)time(0);
+  randctx rc;
 
-   /* Calculate the coordinate scaling factor for the kernel values */
-   if (fw > 0.0)
-      adjust = sf_supp * fwidth / fw;
-   else
-      adjust = 1.0;
+  /* Set up the isaac rng */
+  for (lp = 0; lp < RANDSIZ; lp++)
+     rc.randrsl[lp] = default_isaac_seed;
 
-   /* Calling function MUST FREE THE RETURNED KERNEL, lest ye leak memory */
-   (*filter) = (double *)malloc(sizeof(double) * fwidth * fwidth);
-
-   /* fill in the coefs */
-   for (i = 0; i < fwidth; i++)
-      for (j = 0; j < fwidth; j++) {
-      
-         /* Calculate the function inputs for the kernel function */
-         ii = ((2.0 * i + 1.0) / (double)fwidth - 1.0)*adjust;
-         jj = ((2.0 * j + 1.0) / (double)fwidth - 1.0)*adjust;
-
-         /* Scale for scanlines */
-         if (field) jj *= 2.0;
-
-         /* Adjust for aspect ratio */
-         jj /= aspect_ratio;
-
-         (*filter)[i + j * fwidth] = 
-               flam3_spatial_filter(sf_kernel,ii) * flam3_spatial_filter(sf_kernel,jj);
-      }
+  irandinit(&rc,1);
 
 
-   if (normalize_vector((*filter), fwidth * fwidth)) {
-      fprintf(stderr, "Spatial filter value is too small: %g.  Terminating.\n",sf_radius);
-      exit(1);
-   }   
-   
-   return (fwidth);
+  if (ntries < 1) ntries = 10000;
+
+  for (i = 0; i < ntries; i++) {
+    x = flam3_random_isaac_11(&rc);
+    y = flam3_random_isaac_11(&rc);
+
+    p[0] = x;
+    p[1] = y;
+    p[2] = 0.0;
+    p[3] = 0.0;
+
+    // get into the attractor
+    prepare_xform_fn_ptrs(cp,&rc);
+    xform_distrib = flam3_create_xform_distrib(cp);
+    flam3_iterate(cp, 1, 20+(random()%10), p, xform_distrib, &rc);
+    free(xform_distrib);
+
+    x = p[0];
+    y = p[1];
+
+    // take one deterministic step
+    srandom(i);
+
+    prepare_xform_fn_ptrs(cp,&rc);
+    xform_distrib = flam3_create_xform_distrib(cp);
+    flam3_iterate(cp, 1, 0, p, xform_distrib, &rc);
+    free(xform_distrib);
+
+    xn = p[0];
+    yn = p[1];
+
+    do {
+      dx = flam3_random_isaac_11(&rc);
+      dy = flam3_random_isaac_11(&rc);
+      r = sqrt(dx * dx + dy * dy);
+    } while (r == 0.0);
+    dx /= r;
+    dy /= r;
+
+    dx *= eps;
+    dy *= eps;
+
+    p[0] = x + dx;
+    p[1] = y + dy;
+    p[2] = 0.0;
+
+    // take the same step but with eps
+    srandom(i);
+    prepare_xform_fn_ptrs(cp,&rc);
+    xform_distrib = flam3_create_xform_distrib(cp);
+    flam3_iterate(cp, 1, 0, p, xform_distrib, &rc);
+    free(xform_distrib);
+
+    xn2 = p[0];
+    yn2 = p[1];
+
+    r = sqrt((xn-xn2)*(xn-xn2) + (yn-yn2)*(yn-yn2));
+
+    sum += log(r/eps);
+  }
+  return sum/(log(2.0)*ntries);
 }
 
-double flam3_create_temporal_filter(int numsteps, int filter_type, double filter_exp, double filter_width,
-                                    double **temporal_filter, double **temporal_deltas) {
-
-   double maxfilt = 0.0;
-   double sumfilt = 0.0;
-   double slpx,halfsteps;
-   double *deltas, *filter;
-   
-   int i;
-
-   /* Allocate memory - this must be freed in the calling routine! */   
-   deltas = (double *)malloc(numsteps*sizeof(double));
-   filter = (double *)malloc(numsteps*sizeof(double));
-   
-   /* Deal with only one step */
-   if (numsteps==1) {
-      deltas[0] = 0;
-      filter[0] = 1.0;
-      *temporal_deltas = deltas;
-      *temporal_filter = filter;
-      return(1.0);
-   }
-      
-
-   /* Define the temporal deltas */   
-   for (i = 0; i < numsteps; i++)
-      deltas[i] = ((double)i /(double)(numsteps - 1) - 1.0)*filter_width;
-      
-   /* Define the filter coefs */
-   if (flam3_temporal_exp == filter_type) {
-
-      for (i=0; i < numsteps; i++) {
-
-         if (filter_exp>=0)
-            slpx = ((double)i+1.0)/numsteps;
-         else
-            slpx = (double)(numsteps - i)/numsteps;
-
-         /* Scale the color based on these values */
-         filter[i] = pow(slpx,fabs(filter_exp));
-         
-         /* Keep the max */
-         if (filter[i]>maxfilt)
-            maxfilt = filter[i];
-      }
-
-   } else if (flam3_temporal_gaussian == filter_type) {
-
-      halfsteps = numsteps/2.0;
-      for (i=0; i < numsteps; i++) {
-      
-         /* Gaussian */
-         filter[i] = flam3_spatial_filter(flam3_gaussian_kernel,
-                           flam3_spatial_support[flam3_gaussian_kernel]*fabs(i - halfsteps)/halfsteps);
-         /* Keep the max */
-         if (filter[i]>maxfilt)
-            maxfilt = filter[i];
-      }
-      
-   } else { // (flam3_temporal_box)
-
-      for (i=0; i < numsteps; i++)
-         filter[i] = 1.0;
-         
-	   maxfilt = 1.0;
-	   
-   }
-
-   /* Adjust the filter so that the max is 1.0, and */
-   /* calculate the K2 scaling factor  */
-   for (i=0;i<numsteps;i++) {
-      filter[i] /= maxfilt;
-      sumfilt += filter[i];
-   }
-         
-   sumfilt /= numsteps;
-   
-   *temporal_deltas = deltas;
-   *temporal_filter = filter;
-   
-   return(sumfilt);
-}                                     
-
-flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double curve, int ss) {
-
-   flam3_de_helper de;
-   double comp_max_radius, comp_min_radius;
-   double num_de_filters_d;
-   int num_de_filters,de_max_ind;
-   int de_row_size, de_half_size, de_kernel_index;
-   int filtloop;
-   int keep_thresh=100;
-
-   if (curve <= 0.0) {
-      fprintf(stderr,"estimator curve must be > 0\n");
-      exit(1);
-   }
-
-   if (max_rad < min_rad) {
-      fprintf(stderr,"estimator must be larger than estimator_minimum.\n");
-      fprintf(stderr,"(%f > %f) ? \n",max_rad,min_rad);
-      exit(1);
-   }
-
-   /* We should scale the filter width by the oversample          */
-   /* The '+1' comes from the assumed distance to the first pixel */
-   comp_max_radius = max_rad*ss + 1;
-   comp_min_radius = min_rad*ss + 1;
-
-   /* Calculate how many filter kernels we need based on the decay function */
-   /*                                                                       */
-   /*    num filters = (de_max_width / de_min_width)^(1/estimator_curve)    */
-   /*                                                                       */
-   num_de_filters_d = pow( comp_max_radius/comp_min_radius, 1.0/curve );
-   num_de_filters = ceil(num_de_filters_d);
-         
-   /* Condense the smaller kernels to save space */
-   if (num_de_filters>keep_thresh) { 
-      de_max_ind = ceil(DE_THRESH + pow(num_de_filters-DE_THRESH,curve))+1;
-      de.max_filtered_counts = pow( (double)(de_max_ind-DE_THRESH), 1.0/curve) + DE_THRESH;
-   } else {
-      de_max_ind = num_de_filters;
-      de.max_filtered_counts = de_max_ind;
-   }
-
-   /* Allocate the memory for these filters */
-   /* and the hit/width lookup vector       */
-   de_row_size = 2*ceil(comp_max_radius)-1;
-   de_half_size = (de_row_size-1)/2;
-   de.kernel_size = (de_half_size+1)*(2+de_half_size)/2;
-
-   de.filter_coefs = (double *) malloc (de_max_ind * de.kernel_size * sizeof(double));
-   de.filter_widths = (double *) malloc (de_max_ind * sizeof(double));
-
-   /* Generate the filter coefficients */
-   de.max_filter_index = 0;
-   for (filtloop=0;filtloop<de_max_ind;filtloop++) {
-
-      double de_filt_sum=0.0, de_filt_d;
-      double de_filt_h;
-      int dej,dek;
-      double adjloop;
-      double coef;
-      int filter_coef_idx;
-
-      /* Calculate the filter width for this number of hits in a bin */
-      if (filtloop<keep_thresh)
-         de_filt_h = (comp_max_radius / pow(filtloop+1,curve));
-      else {
-         adjloop = pow(filtloop-keep_thresh,(1.0/curve)) + keep_thresh;
-         de_filt_h = (comp_max_radius / pow(adjloop+1,curve));
-      }
-
-      /* Once we've reached the min radius, don't populate any more */
-      if (de_filt_h <= comp_min_radius) {
-         de_filt_h = comp_min_radius;
-         de.max_filter_index = filtloop;
-      }
-
-      de.filter_widths[filtloop] = de_filt_h;
-
-      /* Calculate norm of kernel separately (easier) */
-      for (dej=-de_half_size; dej<=de_half_size; dej++) {
-         for (dek=-de_half_size; dek<=de_half_size; dek++) {
-            
-            de_filt_d = sqrt( (double)(dej*dej+dek*dek) ) / de_filt_h;
-
-            /* Only populate the coefs within this radius */
-            if (de_filt_d <= 1.0) {
-
-               /* Gaussian */
-               de_filt_sum += flam3_spatial_filter(flam3_gaussian_kernel,
-                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d);
-
-               /* Epanichnikov */
-//             de_filt_sum += (1.0 - (de_filt_d * de_filt_d));
-            }
-         }
-      }
-
-      filter_coef_idx = filtloop*de.kernel_size;
-
-      /* Calculate the unique entries of the kernel */
-      for (dej=0; dej<=de_half_size; dej++) {
-         for (dek=0; dek<=dej; dek++) {
-            de_filt_d = sqrt( (double)(dej*dej+dek*dek) ) / de_filt_h;
-
-            /* Only populate the coefs within this radius */
-            if (de_filt_d>1.0)
-               de.filter_coefs[filter_coef_idx] = 0.0;
-            else {
-
-               /* Gaussian */
-               de.filter_coefs[filter_coef_idx] = flam3_spatial_filter(flam3_gaussian_kernel,
-                        flam3_spatial_support[flam3_gaussian_kernel]*de_filt_d)/de_filt_sum; 
-                            
-               /* Epanichnikov */
-//             de_filter_coefs[filter_coef_idx] = (1.0 - (de_filt_d * de_filt_d))/de_filt_sum;
-            }
-                  
-            filter_coef_idx ++;
-         }
-      }
-
-      if (de.max_filter_index>0)
-         break;
-   }
-
-   if (de.max_filter_index==0)
-      de.max_filter_index = de_max_ind-1;
-
-   
-   return(de);
-}
-                                  
-void flam3_calc_newrgb(double *cbuf, double ls, double highpow, double *newrgb) {
-
-   int rgbi;
-   double newls,lsratio;
-   double newhsv[3];
-   double a, maxa=-1.0, maxc;
-   
-   /* Identify the most saturated channel */
-   for (rgbi=0;rgbi<3;rgbi++) {
-      a = ls * (cbuf[rgbi]/PREFILTER_WHITE);
-      if (a>maxa) {
-         maxa = a;
-         maxc = cbuf[rgbi]/PREFILTER_WHITE;
-      }
-   }
-   
-   /* If a channel is saturated and we have a non-negative highlight power */
-   /* modify the color to prevent hue shift                                */
-   if (maxa>255 && highpow>=0.0) {
-      newls = 255.0/maxc;
-      lsratio = pow(newls/ls,highpow);
-
-      /* Calculate the max-value color (ranged 0 - 1) */
-      for (rgbi=0;rgbi<3;rgbi++)
-         newrgb[rgbi] = newls*(cbuf[rgbi]/PREFILTER_WHITE)/255.0;
-
-      /* Reduce saturation by the lsratio */
-      rgb2hsv(newrgb,newhsv);
-      newhsv[1] *= lsratio;
-      hsv2rgb(newhsv,newrgb);
-
-      for (rgbi=0;rgbi<3;rgbi++)
-         newrgb[rgbi] *= 255.0;
-      
-   } else {
-      for (rgbi=0;rgbi<3;rgbi++)
-         newrgb[rgbi] = ls*(cbuf[rgbi]/PREFILTER_WHITE);
-   }
-}

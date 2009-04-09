@@ -36,6 +36,7 @@
 #define basename(x) strdup(x)
 #endif
 
+#define PREFILTER_WHITE 255
 #define EPS (1e-10)
 #define CMAP_SIZE 256
 #define CMAP_SIZE_M1 255
@@ -43,9 +44,6 @@
 #define flam3_variation_none   (-1)
 #define max_specified_vars     (100)
 #define vlen(x) (sizeof(x)/sizeof(*x))
-
-extern void rgb2hsv(double *rgb, double *hsv);
-extern void hsv2rgb(double *hsv, double *rgb);
 
 
 #ifdef WIN32

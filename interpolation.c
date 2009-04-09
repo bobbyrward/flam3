@@ -17,6 +17,7 @@
 */
 
 #include "interpolation.h"
+#include "palettes.h"
 
 double adjust_percentage(double in) {
 
