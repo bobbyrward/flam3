@@ -34,9 +34,148 @@
 
 /* allow this many iterations for settling into attractor */
 #define FUSE 15
-
-
 #define WHITE_LEVEL 255
+
+
+typedef struct {
+
+   bucket *b;
+   abucket *accumulate;
+   int width, height, oversample;
+   flam3_de_helper *de;
+   double k1,k2;
+   double curve;
+   int last_thread;
+   int start_row, end_row;
+   flam3_frame *spec;
+   int aborted;
+   
+} de_thread_helper;
+
+static void de_thread(void *dth) {
+
+   de_thread_helper *dthp = (de_thread_helper *)dth;
+   int oversample = dthp->oversample;   
+   int ss = (int)floor(oversample / 2.0);
+   int scf = !(oversample & 1);
+   double scfact = pow(oversample/(oversample+1.0), 2.0);
+   int wid=dthp->width;
+   int hig=dthp->height;
+   int str = (oversample-1)+dthp->start_row;
+   int enr = (oversample-1)+dthp->end_row;
+   int i,j;
+   time_t progress_timer=0;
+         
+   /* Density estimation code */         
+   for (j = str; j < enr; j++) {
+      for (i = oversample-1; i < wid-(oversample-1); i++) {
+
+         int ii,jj;
+         double f_select=0.0;
+         int f_select_int,f_coef_idx;
+         int arr_filt_width;
+         bucket *b;
+         double c[4],ls;
+               
+         b = dthp->b + i + j*wid;
+         
+         /* Don't do anything if there's no hits here */
+         if (b[0][4] == 0 || b[0][3] == 0)
+            continue;
+
+         /* Count density in ssxss area   */
+         /* Scale if OS>1 for equal iters */
+         for (ii=-ss; ii<=ss; ii++) {
+            for (jj=-ss; jj<=ss; jj++) {
+               b = dthp->b + (i + ii) + (j + jj)*wid;
+               f_select += b[0][4]/255.0;
+            }
+         }
+               
+         if (scf)
+            f_select *= scfact;
+                  
+         if (f_select > dthp->de->max_filtered_counts)
+            f_select_int = dthp->de->max_filter_index;                  
+         else if (f_select<=DE_THRESH)
+            f_select_int = (int)ceil(f_select)-1;
+         else
+            f_select_int = (int)DE_THRESH +
+               (int)floor(pow(f_select-DE_THRESH,dthp->curve));
+
+         /* If the filter selected below the min specified clamp it to the min */
+         if (f_select_int > dthp->de->max_filter_index)
+            f_select_int = dthp->de->max_filter_index;
+
+         /* We only have to calculate the values for ~1/8 of the square */
+         f_coef_idx = f_select_int*dthp->de->kernel_size;
+
+         arr_filt_width = (int)ceil(dthp->de->filter_widths[f_select_int])-1;
+
+         b = dthp->b + i + j*wid;
+
+         for (jj=0; jj<=arr_filt_width; jj++) {
+            for (ii=0; ii<=jj; ii++) {
+            
+               /* Skip if coef is 0 */
+               if (dthp->de->filter_coefs[f_coef_idx]==0.0) {
+                  f_coef_idx++;
+                  continue;
+               }
+                     
+               c[0] = (double) b[0][0];
+               c[1] = (double) b[0][1];
+               c[2] = (double) b[0][2];
+               c[3] = (double) b[0][3];
+
+               ls = dthp->de->filter_coefs[f_coef_idx]*(dthp->k1 * log(1.0 + c[3] * dthp->k2))/c[3];
+
+               c[0] *= ls;
+               c[1] *= ls;
+               c[2] *= ls;
+               c[3] *= ls;
+
+               if (jj==0 && ii==0) {
+                  add_c_to_accum(dthp->accumulate,i,ii,j,jj,wid,hig,c);
+               }
+               else if (ii==0) {
+                  add_c_to_accum(dthp->accumulate,i,jj,j,0,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,-jj,j,0,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,0,j,jj,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,0,j,-jj,wid,hig,c);
+               } else if (jj==ii) {
+                  add_c_to_accum(dthp->accumulate,i,ii,j,jj,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,-ii,j,jj,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,ii,j,-jj,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,-ii,j,-jj,wid,hig,c);
+               } else {
+                  add_c_to_accum(dthp->accumulate,i,ii,j,jj,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,-ii,j,jj,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,ii,j,-jj,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,-ii,j,-jj,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,jj,j,ii,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,-jj,j,ii,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,jj,j,-ii,wid,hig,c);
+                  add_c_to_accum(dthp->accumulate,i,-jj,j,-ii,wid,hig,c);
+               }
+
+               f_coef_idx++;
+
+            }
+         }
+      }
+      
+      if (dthp->last_thread) {
+         /* Standard progress function */
+         if (dthp->spec->verbose && time(NULL) != progress_timer) {
+            progress_timer = time(NULL);
+            fprintf(stderr, "\rdensity estimation: %d/%d          ", j-str, enr-str);
+            fflush(stderr);
+         }
+      }
+
+   }
+}
 
 
 #if defined(HAVE_LIBPTHREAD) && defined(USE_LOCKS)
@@ -69,7 +208,7 @@ static void iter_thread(void *fth) {
       time_t newt = time(NULL);
       /* sub_batch is double so this is sketchy */
       sub_batch_size = (sub_batch + SUB_BATCH_SIZE > ficp->batch_size) ?
-	(ficp->batch_size - sub_batch) : SUB_BATCH_SIZE;
+                           (ficp->batch_size - sub_batch) : SUB_BATCH_SIZE;
 
       if (fthp->first_thread && newt != progress_timer) {
          double percent = 100.0 *
@@ -78,8 +217,9 @@ static void iter_thread(void *fth) {
          int old_mark = 0;
          int ticker;
 
-	 if (ficp->spec->verbose)
-	     fprintf(stderr, "\rchaos: %5.1f%%", percent);
+         if (ficp->spec->verbose)
+            fprintf(stderr, "\rchaos: %5.1f%%", percent);
+            
          progress_timer = newt;
          if (progress_timer_history[progress_history_mark] &&
                 progress_history[progress_history_mark] < percent)
@@ -89,17 +229,17 @@ static void iter_thread(void *fth) {
             eta = (100 - percent) * (progress_timer - progress_timer_history[old_mark])
                   / (percent - progress_history[old_mark]);
 
-	    if (ficp->spec->verbose) {
-		ticker = (progress_timer&1)?':':'.';
-		if (eta < 1000)
-		    ticker = ':';
-		if (eta > 100)
-		    fprintf(stderr, "  ETA%c %.1f minutes", ticker, eta / 60);
-		else
-		    fprintf(stderr, "  ETA%c %ld seconds ", ticker, (long) ceil(eta));
-		fprintf(stderr, "              \r");
-		fflush(stderr);
-	    }
+            if (ficp->spec->verbose) {
+               ticker = (progress_timer&1)?':':'.';
+               if (eta < 1000)
+                  ticker = ':';
+               if (eta > 100)
+                  fprintf(stderr, "  ETA%c %.1f minutes", ticker, eta / 60);
+               else
+                  fprintf(stderr, "  ETA%c %ld seconds ", ticker, (long) ceil(eta));
+               fprintf(stderr, "              \r");
+               fflush(stderr);
+            }
          }
 
          progress_timer_history[progress_history_mark] = progress_timer;
@@ -107,24 +247,25 @@ static void iter_thread(void *fth) {
          progress_history_mark = (progress_history_mark + 1) % 64;
       }
 
+      /* Custom progress function */
       if (ficp->spec->progress) {
-	if (fthp->first_thread) {
-	  if ((*ficp->spec->progress)(ficp->spec->progress_parameter,
+         if (fthp->first_thread) {
+            if ((*ficp->spec->progress)(ficp->spec->progress_parameter,
 				      sub_batch/(double)ficp->batch_size, 0, eta)) {
-	    ficp->aborted = 1;
-            #ifdef HAVE_LIBPTHREAD
-	      pthread_exit((void *)0);
-            #else
-              return;
-            #endif
-	  }
-	} else {
-          #ifdef HAVE_LIBPTHREAD
-	    if (ficp->aborted) pthread_exit((void *)0);
-          #else
+				   ficp->aborted = 1;
+#ifdef HAVE_LIBPTHREAD
+               pthread_exit((void *)0);
+#else
+               return;
+#endif
+            }
+         } else {
+#ifdef HAVE_LIBPTHREAD
+            if (ficp->aborted) pthread_exit((void *)0);
+#else
             if (ficp->aborted) return;
-          #endif
-	}
+#endif
+         }
       }
 
       /* Seed iterations */
@@ -290,7 +431,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
    double gamma = 0.0;
    double background[3];
    int vib_gam_n = 0;
-   time_t progress_timer = 0, progress_began=0;
+   time_t progress_began=0;
    int verbose = spec->verbose;
    int gnm_idx,max_gnm_de_fw,de_offset;
    flam3_genome cp;
@@ -673,154 +814,72 @@ static void render_rectangle(flam3_frame *spec, void *out,
          }
       } else {
       
-         int ss = (int)floor(oversample / 2.0);
-         int scf = !((int)oversample & 1);
-         double scfact = pow(oversample/(oversample+1.0), 2.0);
-/*
-         int jhig = fic.height - 2*(oversample-1) + 1;
-         int iwid = fic.width - 2*(oversample-1) + 1;
-         int jblocks = jhig/64 + 1;
-         int iblocks = iwid/64 + 1;
-         int jb,ib;
-         int jo,io;
-         
-         for (jb=0;jb<jblocks;jb++) {
-            jo = (oversample-1) + jb*64;
-            for (ib=0;ib<iblocks;ib++) {
-               io = (oversample-1) + ib*64;
-               
-               for (j=jo;j<jo+64;j++) {
-                  for (i=io;i<io+64;i++) {
-*/                  
-            
-            
-         
-         
-         /* Density estimation code */
-         /* Remember, we already padded with an extra pixel at the beginning */
-         for (j = oversample-1; j < fic.height-(oversample-1); j++) {
-            for (i = oversample-1; i < fic.width-(oversample-1); i++) {
-
-               int ii,jj;
-               double f_select=0.0;
-               int f_select_int,f_coef_idx;
-               int arr_filt_width;
-               bucket *b;
-               double c[4],ls;
-               
-//               if (j >= fic.height-(oversample-1))
-//                  continue;
+         de_thread_helper *deth;
+         int myspan = (fic.height-2*(oversample-1)+1);
+         int swath = myspan/(spec->nthreads);
                   
-//               if (i >= fic.width-(oversample-1))
-//                  continue;
-
-               b = buckets + i + j*fic.width;
-
-               /* Don't do anything if there's no hits here */
-               if (b[0][4] == 0 || b[0][3] == 0)
-                  continue;
-
-               /* Count density in ssxss area   */
-               /* Scale if OS>1 for equal iters */
-               for (ii=-ss; ii<=ss; ii++) {
-                  for (jj=-ss; jj<=ss; jj++) {
-                     b = buckets + (i + ii) + (j + jj)*fic.width;
-                     f_select += b[0][4]/255.0;
-                  }
+         /* Create the de helper structures */
+         deth = (de_thread_helper *)calloc(spec->nthreads,sizeof(de_thread_helper));
+         
+         for (thi=0;thi<(spec->nthreads);thi++) {
+         
+            /* Set up the contents of the helper structure */
+            deth[thi].b = buckets;
+            deth[thi].accumulate = accumulate;
+            deth[thi].width = fic.width;
+            deth[thi].height = fic.height;
+            deth[thi].oversample = oversample;
+            deth[thi].de = &de;
+            deth[thi].k1 = k1;
+            deth[thi].k2 = k2;
+            deth[thi].curve = cp.estimator_curve;
+            deth[thi].spec = spec;
+            deth[thi].aborted = 0;
+            if ( (spec->nthreads)>myspan) { /* More threads than rows */
+               deth[thi].start_row=0;
+               if (thi==spec->nthreads-1) {
+                  deth[thi].end_row=myspan;
+                  deth[thi].last_thread=1;
+               } else {
+                  deth[thi].end_row=-1;
+                  deth[thi].last_thread=0;
                }
-               
-               if (scf)
-                  f_select *= scfact;
-                  
-               if (f_select > de.max_filtered_counts)
-                  f_select_int = de.max_filter_index;                  
-               else if (f_select<=DE_THRESH)
-                  f_select_int = (int)ceil(f_select)-1;
-               else
-                  f_select_int = (int)DE_THRESH +
-                     (int)floor(pow(f_select-DE_THRESH,cp.estimator_curve));
-
-               /* If the filter selected below the min specified clamp it to the min */
-               if (f_select_int > de.max_filter_index)
-                  f_select_int = de.max_filter_index;
-
-               /* We only have to calculate the values for ~1/8 of the square */
-               f_coef_idx = f_select_int*de.kernel_size;
-
-               arr_filt_width = (int)ceil(de.filter_widths[f_select_int])-1;
-
-               b = buckets + i + j*fic.width;
-
-               for (jj=0; jj<=arr_filt_width; jj++) {
-                  for (ii=0; ii<=jj; ii++) {
-
-                     /* Skip if coef is 0 */
-                     if (de.filter_coefs[f_coef_idx]==0.0) {
-                        f_coef_idx++;
-                        continue;
-                     }
-                     
-                     c[0] = (double) b[0][0];
-                     c[1] = (double) b[0][1];
-                     c[2] = (double) b[0][2];
-                     c[3] = (double) b[0][3];
-
-                     ls = de.filter_coefs[f_coef_idx]*(k1 * log(1.0 + c[3] * k2))/c[3];
-
-                     c[0] *= ls;
-                     c[1] *= ls;
-                     c[2] *= ls;
-                     c[3] *= ls;
-
-                     if (jj==0 && ii==0) {
-                        add_c_to_accum(accumulate,i,ii,j,jj,fic.width,fic.height,c);
-                     }
-                     else if (ii==0) {
-                        add_c_to_accum(accumulate,i,jj,j,0,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,-jj,j,0,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,0,j,jj,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,0,j,-jj,fic.width,fic.height,c);
-                     } else if (jj==ii) {
-                        add_c_to_accum(accumulate,i,ii,j,jj,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,-ii,j,jj,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,ii,j,-jj,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,-ii,j,-jj,fic.width,fic.height,c);
-                     } else {
-                        add_c_to_accum(accumulate,i,ii,j,jj,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,-ii,j,jj,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,ii,j,-jj,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,-ii,j,-jj,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,jj,j,ii,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,-jj,j,ii,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,jj,j,-ii,fic.width,fic.height,c);
-                        add_c_to_accum(accumulate,i,-jj,j,-ii,fic.width,fic.height,c);
-                     }
-
-                     f_coef_idx++;
-
-                  }
+            } else { /* Normal case */
+               deth[thi].start_row=thi*swath;
+               deth[thi].end_row=(thi+1)*swath;
+               if (thi==spec->nthreads-1) {
+                  deth[thi].end_row=myspan;
+                  deth[thi].last_thread=1;
+               } else {
+                  deth[thi].last_thread=0;
                }
-
             }
-       if (verbose && time(NULL) != progress_timer) {
-      progress_timer = time(NULL);
-      fprintf(stderr, "\rdensity estimation: %d/%d          ", j, fic.height);
-      fflush(stderr);
-       }
-//       }
-//       }
-
-
-      if (fic.spec->progress) {
-	if ((*fic.spec->progress)(fic.spec->progress_parameter,
-				  j/(double)fic.height, 1, 0.0)) {
-	   if (verbose) fprintf(stderr, "\naborted!\n");
-	  goto done;
-	  }
-      }
-
          }
+
+#ifdef HAVE_LIBPTHREAD
+         /* Let's make some threads */
+         myThreads = (pthread_t *)malloc(spec->nthreads * sizeof(pthread_t));
+
+         pthread_attr_init(&pt_attr);
+         pthread_attr_setdetachstate(&pt_attr,PTHREAD_CREATE_JOINABLE);
+
+         for (thi=0; thi <spec->nthreads; thi ++)
+            pthread_create(&myThreads[thi], &pt_attr, (void *)de_thread, (void *)(&(deth[thi])));
+
+         pthread_attr_destroy(&pt_attr);
+
+         /* Wait for them to return */
+         for (thi=0; thi < spec->nthreads; thi++)
+            pthread_join(myThreads[thi], (void **)&thread_status);
          
+         free(myThreads);            
+#else         
+         for (thi=0; thi <spec->nthreads; thi ++)
+            de_thread((void *)(&(deth[thi])));
+#endif
+
+         free(deth);
+                  
       } /* End density estimation loop */
 
 

@@ -543,8 +543,6 @@ void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist);
 void flam3_estimate_bounding_box(flam3_genome *g, double eps, int nsamples,
              double *bmin, double *bmax, randctx *rc);
 void flam3_rotate(flam3_genome *g, double angle, int interp_type); /* angle in degrees */
-void flam3_align(flam3_genome *dst, flam3_genome *src, int nsrc);
-void establish_asymmetric_refangles(flam3_genome *cp, int ncps);
 
 double flam3_dimension(flam3_genome *g, int ntries, int clip_to_camera);
 double flam3_lyapunov(flam3_genome *g, int ntries);
@@ -597,9 +595,8 @@ void flam3_free(void *ptr);
 
 void flam3_srandom();
 
-double flam3_calc_alpha(double density, double gamma, double linrange); 
-void flam3_calc_newrgb(double *cbuf, double ls, double highpow, double *newrgb);
-
+flam3_genome *sheep_loop(flam3_genome *cp, double blend);
+flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag);
 
 /* Motion function indices */
 #define MOTION_SIN 1

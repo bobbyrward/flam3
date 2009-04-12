@@ -97,10 +97,6 @@ flam3_genome *string_to_cp(char *s, int *n) {
   return cp;
 }
 
-double smoother(double t) {
-  return 3*t*t - 2*t*t*t;
-}
-
 xmlDocPtr create_new_editdoc(char *action, flam3_genome *parent0, flam3_genome *parent1) {
 
    xmlDocPtr doc = NULL, comment_doc = NULL;
@@ -250,146 +246,101 @@ void offset(flam3_genome *g) {
     g->center[1] += oy / (g->pixels_per_unit * g->spatial_oversample);
 }
 
-void
-spin(int frame, double blend, flam3_genome *parent, flam3_genome *templ)
+void spin(int frame, double blend, flam3_genome *parent, flam3_genome *templ)
 {
-  flam3_genome result;
-  char action[50];
-  xmlDocPtr doc;
-  int i,j;
+   flam3_genome *result;
+   char action[50];
+   xmlDocPtr doc;
+   int i;
 
-  memset(&result, 0, sizeof(flam3_genome));
-  flam3_copy(&result,parent);
+   /* Spin the parent blend*360 degrees */
+   result = sheep_loop(parent,blend);
 
-  /*
-   * Insert motion magic here :
-   * if there are motion elements, we will modify the contents of
-   * the result genome before flam3_rotate is called.
-   */
-  
-  for (i=0;i<parent->num_xforms;i++) {
-     if (parent->xform[i].num_motion>0) {
-        /* Apply motion parameters to result.xform[i] using blend parameter */
-        apply_motion_parameters(&parent->xform[i], &result.xform[i], blend);
-     }
-  }
+   /* Apply the template if necessary */  
+   if (templ)
+      flam3_apply_template(result, templ);
 
+   /* Set genome parameters accordingly */
+   result->time = (double)frame;
+   result->interpolation = flam3_interpolation_linear;
+   result->palette_interpolation = flam3_palette_interpolation_hsv;
 
-  flam3_rotate(&result, blend*360.0,result.interpolation_type);
-  
-  if (templ)
-     flam3_apply_template(&result, templ);
+   /* Force linear interpolation - unsure if this is still necessary     */
+   /* I believe we put this in so that older clients could render frames */
+   //result->interpolation_type = flam3_inttype_linear;
 
-  result.time = (double)frame;
-  result.interpolation = flam3_interpolation_linear;
+   /* Create the edit doc xml */
+   sprintf(action,"rotate %g",blend*360.0);
+   doc = create_new_editdoc(action, parent, (flam3_genome *)NULL);
+   result->edits = doc;
 
-  /* Switch to linear interpolation */
-  result.interpolation_type = flam3_inttype_linear;
+   /* Subpixel jitter */
+   offset(result);
 
-  result.palette_interpolation = flam3_palette_interpolation_hsv;
+   /* Make the name of the flame the time */
+   sprintf(result->flame_name,"%f",result->time);
 
-  sprintf(action,"rotate %g",blend*360.0);
-  doc = create_new_editdoc(action, parent, (flam3_genome *)NULL);
-  result.edits = doc;
+   /* Print the resulting xml */
+   gprint(result, 1);
 
-  offset(&result);
+   /* Clear out the xml doc */
+   xmlFreeDoc(result->edits);
 
-  /* Make the name of the flame the time */
-  sprintf(result.flame_name,"%f",result.time);
-
-  gprint(&result, 1);
-
-  xmlFreeDoc(result.edits);
-
-  /* Clear the result cp */
-  clear_cp(&result,flam3_defaults_on);
+   /* Clear the result cp */
+   clear_cp(result,flam3_defaults_on);
+ 
+   /* Free the cp allocated in flam3_sheep_loop */ 
+   free(result);
 }
 
 void spin_inter(int frame, double blend, int seqflag, flam3_genome *parents, flam3_genome *templ) {
-  flam3_genome spun[2];
-  flam3_genome spun_prealign[2];
-  flam3_genome result;
-  char action[50];
-  xmlDocPtr doc;
-  int i,si;
 
-  memset(spun, 0, 2*sizeof(flam3_genome));
-  memset(spun_prealign, 0, 2*sizeof(flam3_genome));
-  memset(&result, 0, sizeof(flam3_genome));
+   flam3_genome *result;
+   char action[50];
+   xmlDocPtr doc;
 
-  /*
-   * Insert motion magic here :
-   * if there are motion elements, we will modify the contents of
-   * the prealign genomes before we rotate and interpolate.
-   */
-  
-  for (si=0;si<2;si++) {
-     flam3_copy(&(spun_prealign[si]), &(parents[si]));
-     for (i=0;i<parents[si].num_xforms;i++) {
-        if (parents[si].xform[i].num_motion>0) {
-           /* Apply motion parameters to result.xform[i] using blend parameter */
-           apply_motion_parameters(&parents[si].xform[i], &spun_prealign[si].xform[i], blend);
-        }
-     }
-  }
+   /* Interpolate between spun parents */
+   result = sheep_edge(parents, blend, seqflag);
 
-  flam3_align(spun, spun_prealign, 2);
-
-  if (seqflag && 0.0 == blend) {
-     /* Use the un-padded original for blend=0 */
-     flam3_copy(&result, &(spun_prealign[0]) );
-
-  } else {
-     spun[0].time = 0.0;
-     spun[1].time = 1.0;
-
-     /* Call this first to establish the asymmetric reference angles */
-     establish_asymmetric_refangles(spun,2);  
-
-     flam3_rotate(&spun[0], blend*360.0, spun[0].interpolation_type);
-     flam3_rotate(&spun[1], blend*360.0, spun[0].interpolation_type);
-
-     /* Now call the interpolation */
-     flam3_interpolate(spun, 2, smoother(blend), &result);
-     if (!seqflag)
-        result.interpolation_type = flam3_inttype_linear;
-  }
-  
-  if ((parents[0].palette_index != flam3_palette_random) &&
+   /* Unsure why we check for random palettes on both ends... */  
+   if ((parents[0].palette_index != flam3_palette_random) &&
       (parents[1].palette_index != flam3_palette_random)) {
-    result.palette_index = flam3_palette_interpolated;
-    result.palette_index0 = parents[0].palette_index;
-    result.hue_rotation0 = parents[0].hue_rotation;
-    result.palette_index1 = parents[1].palette_index;
-    result.hue_rotation1 = parents[1].hue_rotation;
-    result.palette_blend = blend;
-  }
 
-  if (templ)
-     flam3_apply_template(&result, templ);
+         result->palette_index = flam3_palette_interpolated;
+         result->palette_index0 = parents[0].palette_index;
+         result->hue_rotation0 = parents[0].hue_rotation;
+         result->palette_index1 = parents[1].palette_index;
+         result->hue_rotation1 = parents[1].hue_rotation;
+         result->palette_blend = blend;
+   }
 
-  result.time = (double)frame;
+   /* Apply template if necessary */
+   if (templ)
+      flam3_apply_template(result, templ);
 
-  sprintf(action,"interpolate %g",blend*360.0);
-  doc = create_new_editdoc(action, &parents[0], &parents[1]);
+   /* Set genome attributes */
+   result->time = (double)frame;
 
-  result.edits = doc;
+   /* Create the edit doc xml */
+   sprintf(action,"interpolate %g",blend*360.0);
+   doc = create_new_editdoc(action, &parents[0], &parents[1]);
+   result->edits = doc;
 
-  offset(&result);
-  
-  /* Make the name of the flame the time */
-  sprintf(result.flame_name,"%f",result.time);
-  
-  gprint(&result, 1);
+   /* Subpixel jitter *
+   offset(result);
 
-  xmlFreeDoc(result.edits);
+   /* Make the name of the flame the time */
+   sprintf(result->flame_name,"%f",result->time);
 
-  /* Free xform storage */
-  clear_cp(&spun[0],flam3_defaults_on);
-  clear_cp(&spun[1],flam3_defaults_on);
-  clear_cp(&spun_prealign[0],flam3_defaults_on);
-  clear_cp(&spun_prealign[1],flam3_defaults_on);
-  clear_cp(&result,flam3_defaults_on);
+   /* Print the genome */  
+   gprint(result, 1);
+
+   /* Clean up */
+   xmlFreeDoc(result->edits);
+
+   /* Free genome storage */
+   clear_cp(result,flam3_defaults_on);
+   free(result);
 }
 
 void add_to_action(char *action, char *addtoaction) {

@@ -567,3 +567,322 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
    }
 }
 
+void establish_asymmetric_refangles(flam3_genome *cp, int ncps) {
+
+   int k, xfi, col;
+   
+   double cxang[4][2],d,c1[2];
+
+   for (xfi=0; xfi<cp[0].num_xforms; xfi++) {
+   
+      /* Final xforms don't rotate regardless of their symmetry */
+      if (cp[0].final_xform_enable==1 && xfi==cp[0].final_xform_index)
+         continue;
+
+      for (k=0; k<ncps;k++) {
+
+         /* Establish the angle for each component */
+         /* Should potentially functionalize */
+         for (col=0;col<2;col++) {
+         
+            c1[0] = cp[k].xform[xfi].c[col][0];
+            c1[1] = cp[k].xform[xfi].c[col][1];
+            
+            cxang[k][col] = atan2(c1[1],c1[0]);
+         }
+      }
+      
+      for (k=1; k<ncps; k++) {
+     
+         for (col=0;col<2;col++) {
+
+            int sym0,sym1;
+            int padsymflag;
+
+            d = cxang[k][col]-cxang[k-1][col];
+
+            /* Adjust to avoid the -pi/pi discontinuity */
+            if (d > M_PI+EPS)
+            cxang[k][col] -= 2*M_PI;
+            else if (d < -(M_PI-EPS) )
+            cxang[k][col] += 2*M_PI;
+
+            /* If this is an asymmetric case, store the NON-symmetric angle    */
+            /* Check them pairwise and store the reference angle in the second */
+            /* to avoid overwriting if asymmetric on both sides                */
+            padsymflag = 0;
+         
+            sym0 = (cp[k-1].xform[xfi].animate>0 || (cp[k-1].xform[xfi].padding==1 && padsymflag));
+            sym1 = (cp[k].xform[xfi].animate>0 || (cp[k].xform[xfi].padding==1 && padsymflag));
+
+            if ( sym1 && !sym0 )
+               cp[k].xform[xfi].wind[col] = cxang[k-1][col] + 2*M_PI;
+            else if ( sym0 && !sym1 )
+               cp[k].xform[xfi].wind[col] = cxang[k][col] + 2*M_PI;
+
+         }
+      }
+   }
+}
+
+void flam3_align(flam3_genome *dst, flam3_genome *src, int nsrc) {
+   int i, tfx, tnx, max_nx = 0, max_fx = 0;
+   int already_aligned=1;
+   int xf,j;
+   int ii,fnd;
+   double normed;
+   
+   max_nx = src[0].num_xforms - (src[0].final_xform_index >= 0);
+   max_fx = src[0].final_xform_enable;
+   
+   for (i = 1; i < nsrc; i++) {
+      tnx = src[i].num_xforms - (src[i].final_xform_index >= 0);
+      if (max_nx != tnx) {
+         already_aligned = 0;
+         if (tnx > max_nx) max_nx = tnx;
+      }
+      
+      tfx = src[i].final_xform_enable;
+      if (max_fx != tfx) {
+         already_aligned = 0;
+         max_fx |= tfx;
+      }
+   }
+
+   /* Pad the cps to equal xforms */
+   for (i = 0; i < nsrc; i++) {
+      flam3_copyx(&dst[i], &src[i], max_nx, max_fx);
+   }
+      
+   /* Check to see if there's a parametric variation present in one xform   */
+   /* but not in an aligned xform.  If this is the case, use the parameters */
+   /* from the xform with the variation as the defaults for the blank one.  */
+
+   /* Skip if this genome is compatibility mode */
+   if (dst[i].interpolation_type == flam3_inttype_compat ||
+       dst[i].interpolation_type == flam3_inttype_older)
+      return;
+   
+   /* All genomes will have the same number of xforms at this point */
+   /* num = max_nx + max_fx */
+   for (i = 0; i<nsrc; i++) {
+
+       for (xf = 0; xf<max_nx+max_fx; xf++) {
+                  
+          /* Loop over the variations to see which of them are set to 0 */
+          /* Note that there are no parametric variations < 23 */
+          for (j = 23; j < flam3_nvariations; j++) {
+         
+              if (dst[i].xform[xf].var[j]==0) {
+            
+                 if (i>0) {
+                              
+                    /* Check to see if the prior genome's xform is populated */
+                    if (dst[i-1].xform[xf].var[j] != 0) {
+                  
+                       /* Copy the prior genome's parameters and continue */
+                       flam3_copy_params(&(dst[i].xform[xf]), &(dst[i-1].xform[xf]), j);
+                       continue;
+                    }
+
+                 } else if (i<nsrc-1) {
+
+                    /* Check to see if the next genome's xform is populated */
+                    if (dst[i+1].xform[xf].var[j] != 0) {
+                  
+                       /* Copy the next genome's parameters and continue */
+                       flam3_copy_params(&(dst[i].xform[xf]), &(dst[i+1].xform[xf]), j);
+                       continue;
+                    }
+                 }
+              }
+          } /* variations */
+
+          if (dst[i].xform[xf].padding == 1 && !already_aligned) {
+         
+             /* This is a new xform.  Let's see if we can choose a better 'identity' xform. */
+             /* Check the neighbors to see if any of these variations are used: */
+             /* rings2, fan2, blob, perspective, julian, juliascope, ngon, curl, super_shape, split */
+             /* If so, we can use a better starting point for these */
+            
+             /* Remove linear from the list */
+             dst[i].xform[xf].var[0] = 0.0;
+            
+             /* Look through all of the 'companion' xforms to see if we get a match on any of these */
+             fnd=0;
+
+             /* Only do the next substitution for log interpolation */
+             if ( (i==0 && dst[i].interpolation_type == flam3_inttype_log)
+                  || (i>0 && dst[i-1].interpolation_type==flam3_inttype_log) ) {
+
+             for (ii=-1; ii<=1; ii+=2) {
+
+                /* Skip if out of bounds */
+                if (i+ii<0 || i+ii>=nsrc)
+                   continue;
+                  
+                /* Skip if this is also padding */
+                if (dst[i+ii].xform[xf].padding==1)
+                   continue;
+
+                /* Spherical / Ngon (trumps all others due to holes)       */
+                /* Interpolate these against a 180 degree rotated identity */
+                /* with weight -1.                                         */
+                /* Added JULIAN/JULIASCOPE to get rid of black wedges      */
+                if (dst[i+ii].xform[xf].var[VAR_SPHERICAL]>0 ||
+                      dst[i+ii].xform[xf].var[VAR_NGON]>0 || 
+                      dst[i+ii].xform[xf].var[VAR_JULIAN]>0 || 
+                      dst[i+ii].xform[xf].var[VAR_JULIASCOPE]>0 ||
+                      dst[i+ii].xform[xf].var[VAR_POLAR]>0 ||
+                      dst[i+ii].xform[xf].var[VAR_WEDGE_SPH]>0 ||
+                      dst[i+ii].xform[xf].var[VAR_WEDGE_JULIA]>0) {
+                 
+                   dst[i].xform[xf].var[VAR_LINEAR] = -1.0;
+                   /* Set the coefs appropriately */
+                   dst[i].xform[xf].c[0][0] = -1.0;
+                   dst[i].xform[xf].c[0][1] = 0.0;
+                   dst[i].xform[xf].c[1][0] = 0.0;
+                   dst[i].xform[xf].c[1][1] = -1.0;
+                   dst[i].xform[xf].c[2][0] = 0.0;
+                   dst[i].xform[xf].c[2][1] = 0.0;               
+                   fnd=-1;
+                }
+             }
+
+             }
+
+             if (fnd==0) {
+
+                for (ii=-1; ii<=1; ii+=2) {
+
+                   /* Skip if out of bounds */
+                   if (i+ii<0 || i+ii>=nsrc)
+                      continue;
+                     
+                   /* Skip if also padding */
+                   if (dst[i+ii].xform[xf].padding==1)
+                      continue;
+
+                   /* Rectangles */
+                   if (dst[i+ii].xform[xf].var[VAR_RECTANGLES]>0) {
+                      dst[i].xform[xf].var[VAR_RECTANGLES] = 1.0;
+                      dst[i].xform[xf].rectangles_x = 0.0;
+                      dst[i].xform[xf].rectangles_y = 0.0;
+                      fnd++;
+                   }
+
+                   /* Rings 2 */
+                   if (dst[i+ii].xform[xf].var[VAR_RINGS2]>0) {
+                      dst[i].xform[xf].var[VAR_RINGS2] = 1.0;
+                      dst[i].xform[xf].rings2_val = 0.0;
+                      fnd++;
+                   }
+                  
+                   /* Fan 2 */
+                   if (dst[i+ii].xform[xf].var[VAR_FAN2]>0) {
+                      dst[i].xform[xf].var[VAR_FAN2] = 1.0;
+                      dst[i].xform[xf].fan2_x = 0.0;
+                      dst[i].xform[xf].fan2_y = 0.0;
+                      fnd++;
+                   }
+               
+                   /* Blob */
+                   if (dst[i+ii].xform[xf].var[VAR_BLOB]>0) {
+                      dst[i].xform[xf].var[VAR_BLOB] = 1.0;
+                      dst[i].xform[xf].blob_low = 1.0;
+                      dst[i].xform[xf].blob_high = 1.0;
+                      dst[i].xform[xf].blob_waves = 1.0;
+                      fnd++;
+                   }
+               
+                   /* Perspective */
+                   if (dst[i+ii].xform[xf].var[VAR_PERSPECTIVE]>0) {
+                      dst[i].xform[xf].var[VAR_PERSPECTIVE] = 1.0;
+                      dst[i].xform[xf].perspective_angle = 0.0;
+                      /* Keep the perspective distance as-is */
+                      fnd++;
+                   }
+               
+                   /* Curl */
+                   if (dst[i+ii].xform[xf].var[VAR_CURL]>0) {
+                      dst[i].xform[xf].var[VAR_CURL] = 1.0;
+                      dst[i].xform[xf].curl_c1 = 0.0;
+                      dst[i].xform[xf].curl_c2 = 0.0;
+                      fnd++;
+                   }
+
+                   /* Super-Shape */
+                   if (dst[i+ii].xform[xf].var[VAR_SUPER_SHAPE]>0) {
+                      dst[i].xform[xf].var[VAR_SUPER_SHAPE] = 1.0;
+                      /* Keep supershape_m the same */
+                      dst[i].xform[xf].supershape_n1 = 2.0;
+                      dst[i].xform[xf].supershape_n2 = 2.0;
+                      dst[i].xform[xf].supershape_n3 = 2.0;
+                      dst[i].xform[xf].supershape_rnd = 0.0;
+                      dst[i].xform[xf].supershape_holes = 0.0;
+                      fnd++;
+                   }
+                }
+             }
+
+             /* If we didn't have any matches with those, */
+             /* try the affine ones, fan and rings        */
+             if (fnd==0) {
+            
+                for (ii=-1; ii<=1; ii+=2) {
+
+                   /* Skip if out of bounds */
+                   if (i+ii<0 || i+ii>=nsrc)
+                      continue;                  
+
+                   /* Skip if also a padding xform */
+                   if (dst[i+ii].xform[xf].padding==1)
+                      continue;
+                     
+                   /* Fan */
+                   if (dst[i+ii].xform[xf].var[VAR_FAN]>0) {
+                      dst[i].xform[xf].var[VAR_FAN] = 1.0;
+                      fnd++;
+                   }
+
+                   /* Rings */
+                   if (dst[i+ii].xform[xf].var[VAR_RINGS]>0) {
+                      dst[i].xform[xf].var[VAR_RINGS] = 1.0;
+                      fnd++;
+                   }
+
+                }
+               
+                if (fnd>0) {
+                   /* Set the coefs appropriately */
+                   dst[i].xform[xf].c[0][0] = 0.0;
+                   dst[i].xform[xf].c[0][1] = 1.0;
+                   dst[i].xform[xf].c[1][0] = 1.0;
+                   dst[i].xform[xf].c[1][1] = 0.0;
+                   dst[i].xform[xf].c[2][0] = 0.0;
+                   dst[i].xform[xf].c[2][1] = 0.0;               
+                }
+             }
+                                          
+             /* If we still have no matches, switch back to linear */
+             if (fnd==0)
+
+                dst[i].xform[xf].var[VAR_LINEAR] = 1.0;
+
+             else if (fnd>0) {
+
+                /* Otherwise, go through and normalize the weights. */
+                normed = 0.0;
+                for (j = 0; j < flam3_nvariations; j++)
+                   normed += dst[i].xform[xf].var[j];
+                  
+                for (j = 0; j < flam3_nvariations; j++)
+                   dst[i].xform[xf].var[j] /= normed;
+
+             }         
+          }
+       } /* xforms */
+   } /* genomes */
+                              
+}
+

@@ -25,6 +25,7 @@
 #include "interpolation.h"
 #include "parser.h"
 #include "filters.h"
+#include "palettes.h"
 #include <limits.h>
 #include <math.h>
 #include <stdint.h>
@@ -324,6 +325,107 @@ void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
   }
 } 
   
+flam3_genome *sheep_loop(flam3_genome *cp, double blend) {
+   
+   flam3_genome *result;
+   int i;
+
+   /* Allocate the genome - this must be freed by calling function */
+   result = malloc(sizeof(flam3_genome));
+   
+   /* Clear it */
+   clear_cp(result,flam3_defaults_on);
+   
+   /* Copy the original */
+   flam3_copy(result,cp);
+
+   /*
+    * Insert motion magic here :
+    * if there are motion elements, we will modify the contents of
+    * the result genome before flam3_rotate is called.
+    */
+   for (i=0;i<cp->num_xforms;i++) {
+      if (cp->xform[i].num_motion>0) {
+         /* Apply motion parameters to result.xform[i] using blend parameter */
+         apply_motion_parameters(&cp->xform[i], &result->xform[i], blend);
+      }
+   }
+
+   /* Rotate the affines */
+   flam3_rotate(result, blend*360.0,result->interpolation_type);
+   
+   return(result);
+}
+
+double smoother(double t) {
+  return 3*t*t - 2*t*t*t;
+}
+
+
+flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag) {
+
+   flam3_genome spun[2];
+   flam3_genome prealign[2];
+   flam3_genome *result;
+   int i,si;
+
+   memset(spun, 0, 2*sizeof(flam3_genome));
+   memset(prealign, 0, 2*sizeof(flam3_genome));
+
+   /* Allocate the memory for the result */
+   result = malloc(sizeof(flam3_genome));
+
+   /*
+    * Insert motion magic here :
+    * if there are motion elements, we will modify the contents of
+    * the prealign genomes before we rotate and interpolate.
+    */
+  
+   for (si=0;si<2;si++) {
+      flam3_copy(&prealign[si], &cp[si]);
+      for (i=0;i<cp[si].num_xforms;i++) {
+         if (cp[si].xform[i].num_motion>0) {
+            /* Apply motion parameters to result.xform[i] using blend parameter */
+            apply_motion_parameters(&cp[si].xform[i], &prealign[si].xform[i], blend);
+         }
+      }
+   }
+
+   /* Use the un-padded original for blend=0 when creating a sequence */
+   /* This keeps the original interpolation type intact               */
+   if (seqflag && 0.0 == blend) {
+      flam3_copy(result, &prealign[0]);
+   } else {
+
+      /* Align what we're going to interpolate */
+      flam3_align(spun, prealign, 2);
+
+      spun[0].time = 0.0;
+      spun[1].time = 1.0;
+
+      /* Call this first to establish the asymmetric reference angles */
+      establish_asymmetric_refangles(spun,2);  
+
+      /* Rotate the aligned xforms */
+      flam3_rotate(&spun[0], blend*360.0, spun[0].interpolation_type);
+      flam3_rotate(&spun[1], blend*360.0, spun[0].interpolation_type);
+
+      /* Now call the interpolation */
+      flam3_interpolate(spun, 2, smoother(blend), result);
+
+     /* Interpolation type no longer needs to be forced to linear mode */
+//     if (!seqflag)
+//        result.interpolation_type = flam3_inttype_linear;
+   }
+   
+   /* Clear the genomes we used */
+   clear_cp(&spun[0],flam3_defaults_on);
+   clear_cp(&spun[1],flam3_defaults_on);
+   clear_cp(&prealign[0],flam3_defaults_on);
+   clear_cp(&prealign[0],flam3_defaults_on);
+
+   return(result);
+}
 
 
 /* BY is angle in degrees */
@@ -517,325 +619,8 @@ void apply_motion_parameters(flam3_xform *xf, flam3_xform *addto, double blend) 
       
    
 
-void establish_asymmetric_refangles(flam3_genome *cp, int ncps) {
-
-   int k, xfi, col;
-   
-   double cxang[4][2],d,c1[2];
-
-   for (xfi=0; xfi<cp[0].num_xforms; xfi++) {
-   
-      /* Final xforms don't rotate regardless of their symmetry */
-      if (cp[0].final_xform_enable==1 && xfi==cp[0].final_xform_index)
-         continue;
-
-      for (k=0; k<ncps;k++) {
-
-         /* Establish the angle for each component */
-         /* Should potentially functionalize */
-         for (col=0;col<2;col++) {
-         
-            c1[0] = cp[k].xform[xfi].c[col][0];
-            c1[1] = cp[k].xform[xfi].c[col][1];
-            
-            cxang[k][col] = atan2(c1[1],c1[0]);
-         }
-      }
-      
-      for (k=1; k<ncps; k++) {
-     
-         for (col=0;col<2;col++) {
-
-            int sym0,sym1;
-            int padsymflag;
-
-            d = cxang[k][col]-cxang[k-1][col];
-
-            /* Adjust to avoid the -pi/pi discontinuity */
-            if (d > M_PI+EPS)
-            cxang[k][col] -= 2*M_PI;
-            else if (d < -(M_PI-EPS) )
-            cxang[k][col] += 2*M_PI;
-
-            /* If this is an asymmetric case, store the NON-symmetric angle    */
-            /* Check them pairwise and store the reference angle in the second */
-            /* to avoid overwriting if asymmetric on both sides                */
-            padsymflag = 0;
-         
-            sym0 = (cp[k-1].xform[xfi].animate>0 || (cp[k-1].xform[xfi].padding==1 && padsymflag));
-            sym1 = (cp[k].xform[xfi].animate>0 || (cp[k].xform[xfi].padding==1 && padsymflag));
-
-            if ( sym1 && !sym0 )
-               cp[k].xform[xfi].wind[col] = cxang[k-1][col] + 2*M_PI;
-            else if ( sym0 && !sym1 )
-               cp[k].xform[xfi].wind[col] = cxang[k][col] + 2*M_PI;
-
-         }
-      }
-   }
-}
 
    
-void flam3_align(flam3_genome *dst, flam3_genome *src, int nsrc) {
-   int i, tfx, tnx, max_nx = 0, max_fx = 0;
-   int already_aligned=1;
-   int xf,j;
-   int ii,fnd;
-   double normed;
-   
-   max_nx = src[0].num_xforms - (src[0].final_xform_index >= 0);
-   max_fx = src[0].final_xform_enable;
-   
-   for (i = 1; i < nsrc; i++) {
-      tnx = src[i].num_xforms - (src[i].final_xform_index >= 0);
-      if (max_nx != tnx) {
-         already_aligned = 0;
-         if (tnx > max_nx) max_nx = tnx;
-      }
-      
-      tfx = src[i].final_xform_enable;
-      if (max_fx != tfx) {
-         already_aligned = 0;
-         max_fx |= tfx;
-      }
-   }
-
-   /* Pad the cps to equal xforms */
-   for (i = 0; i < nsrc; i++) {
-      flam3_copyx(&dst[i], &src[i], max_nx, max_fx);
-   }
-      
-   /* Check to see if there's a parametric variation present in one xform   */
-   /* but not in an aligned xform.  If this is the case, use the parameters */
-   /* from the xform with the variation as the defaults for the blank one.  */
-
-   /* Skip if this genome is compatibility mode */
-   if (dst[i].interpolation_type == flam3_inttype_compat ||
-       dst[i].interpolation_type == flam3_inttype_older)
-      return;
-   
-   /* All genomes will have the same number of xforms at this point */
-   /* num = max_nx + max_fx */
-   for (i = 0; i<nsrc; i++) {
-
-       for (xf = 0; xf<max_nx+max_fx; xf++) {
-                  
-          /* Loop over the variations to see which of them are set to 0 */
-          /* Note that there are no parametric variations < 23 */
-          for (j = 23; j < flam3_nvariations; j++) {
-         
-              if (dst[i].xform[xf].var[j]==0) {
-            
-                 if (i>0) {
-                              
-                    /* Check to see if the prior genome's xform is populated */
-                    if (dst[i-1].xform[xf].var[j] != 0) {
-                  
-                       /* Copy the prior genome's parameters and continue */
-                       flam3_copy_params(&(dst[i].xform[xf]), &(dst[i-1].xform[xf]), j);
-                       continue;
-                    }
-
-                 } else if (i<nsrc-1) {
-
-                    /* Check to see if the next genome's xform is populated */
-                    if (dst[i+1].xform[xf].var[j] != 0) {
-                  
-                       /* Copy the next genome's parameters and continue */
-                       flam3_copy_params(&(dst[i].xform[xf]), &(dst[i+1].xform[xf]), j);
-                       continue;
-                    }
-                 }
-              }
-          } /* variations */
-
-          if (dst[i].xform[xf].padding == 1 && !already_aligned) {
-         
-             /* This is a new xform.  Let's see if we can choose a better 'identity' xform. */
-             /* Check the neighbors to see if any of these variations are used: */
-             /* rings2, fan2, blob, perspective, julian, juliascope, ngon, curl, super_shape, split */
-             /* If so, we can use a better starting point for these */
-            
-             /* Remove linear from the list */
-             dst[i].xform[xf].var[0] = 0.0;
-            
-             /* Look through all of the 'companion' xforms to see if we get a match on any of these */
-             fnd=0;
-
-             /* Only do the next substitution for log interpolation */
-             if ( (i==0 && dst[i].interpolation_type == flam3_inttype_log)
-                  || (i>0 && dst[i-1].interpolation_type==flam3_inttype_log) ) {
-
-             for (ii=-1; ii<=1; ii+=2) {
-
-                /* Skip if out of bounds */
-                if (i+ii<0 || i+ii>=nsrc)
-                   continue;
-                  
-                /* Skip if this is also padding */
-                if (dst[i+ii].xform[xf].padding==1)
-                   continue;
-
-                /* Spherical / Ngon (trumps all others due to holes)       */
-                /* Interpolate these against a 180 degree rotated identity */
-                /* with weight -1.                                         */
-                /* Added JULIAN/JULIASCOPE to get rid of black wedges      */
-                if (dst[i+ii].xform[xf].var[VAR_SPHERICAL]>0 ||
-                      dst[i+ii].xform[xf].var[VAR_NGON]>0 || 
-                      dst[i+ii].xform[xf].var[VAR_JULIAN]>0 || 
-                      dst[i+ii].xform[xf].var[VAR_JULIASCOPE]>0 ||
-                      dst[i+ii].xform[xf].var[VAR_POLAR]>0 ||
-                      dst[i+ii].xform[xf].var[VAR_WEDGE_SPH]>0 ||
-                      dst[i+ii].xform[xf].var[VAR_WEDGE_JULIA]>0) {
-                 
-                   dst[i].xform[xf].var[VAR_LINEAR] = -1.0;
-                   /* Set the coefs appropriately */
-                   dst[i].xform[xf].c[0][0] = -1.0;
-                   dst[i].xform[xf].c[0][1] = 0.0;
-                   dst[i].xform[xf].c[1][0] = 0.0;
-                   dst[i].xform[xf].c[1][1] = -1.0;
-                   dst[i].xform[xf].c[2][0] = 0.0;
-                   dst[i].xform[xf].c[2][1] = 0.0;               
-                   fnd=-1;
-                }
-             }
-
-             }
-
-             if (fnd==0) {
-
-                for (ii=-1; ii<=1; ii+=2) {
-
-                   /* Skip if out of bounds */
-                   if (i+ii<0 || i+ii>=nsrc)
-                      continue;
-                     
-                   /* Skip if also padding */
-                   if (dst[i+ii].xform[xf].padding==1)
-                      continue;
-
-                   /* Rectangles */
-                   if (dst[i+ii].xform[xf].var[VAR_RECTANGLES]>0) {
-                      dst[i].xform[xf].var[VAR_RECTANGLES] = 1.0;
-                      dst[i].xform[xf].rectangles_x = 0.0;
-                      dst[i].xform[xf].rectangles_y = 0.0;
-                      fnd++;
-                   }
-
-                   /* Rings 2 */
-                   if (dst[i+ii].xform[xf].var[VAR_RINGS2]>0) {
-                      dst[i].xform[xf].var[VAR_RINGS2] = 1.0;
-                      dst[i].xform[xf].rings2_val = 0.0;
-                      fnd++;
-                   }
-                  
-                   /* Fan 2 */
-                   if (dst[i+ii].xform[xf].var[VAR_FAN2]>0) {
-                      dst[i].xform[xf].var[VAR_FAN2] = 1.0;
-                      dst[i].xform[xf].fan2_x = 0.0;
-                      dst[i].xform[xf].fan2_y = 0.0;
-                      fnd++;
-                   }
-               
-                   /* Blob */
-                   if (dst[i+ii].xform[xf].var[VAR_BLOB]>0) {
-                      dst[i].xform[xf].var[VAR_BLOB] = 1.0;
-                      dst[i].xform[xf].blob_low = 1.0;
-                      dst[i].xform[xf].blob_high = 1.0;
-                      dst[i].xform[xf].blob_waves = 1.0;
-                      fnd++;
-                   }
-               
-                   /* Perspective */
-                   if (dst[i+ii].xform[xf].var[VAR_PERSPECTIVE]>0) {
-                      dst[i].xform[xf].var[VAR_PERSPECTIVE] = 1.0;
-                      dst[i].xform[xf].perspective_angle = 0.0;
-                      /* Keep the perspective distance as-is */
-                      fnd++;
-                   }
-               
-                   /* Curl */
-                   if (dst[i+ii].xform[xf].var[VAR_CURL]>0) {
-                      dst[i].xform[xf].var[VAR_CURL] = 1.0;
-                      dst[i].xform[xf].curl_c1 = 0.0;
-                      dst[i].xform[xf].curl_c2 = 0.0;
-                      fnd++;
-                   }
-
-                   /* Super-Shape */
-                   if (dst[i+ii].xform[xf].var[VAR_SUPER_SHAPE]>0) {
-                      dst[i].xform[xf].var[VAR_SUPER_SHAPE] = 1.0;
-                      /* Keep supershape_m the same */
-                      dst[i].xform[xf].supershape_n1 = 2.0;
-                      dst[i].xform[xf].supershape_n2 = 2.0;
-                      dst[i].xform[xf].supershape_n3 = 2.0;
-                      dst[i].xform[xf].supershape_rnd = 0.0;
-                      dst[i].xform[xf].supershape_holes = 0.0;
-                      fnd++;
-                   }
-                }
-             }
-
-             /* If we didn't have any matches with those, */
-             /* try the affine ones, fan and rings        */
-             if (fnd==0) {
-            
-                for (ii=-1; ii<=1; ii+=2) {
-
-                   /* Skip if out of bounds */
-                   if (i+ii<0 || i+ii>=nsrc)
-                      continue;                  
-
-                   /* Skip if also a padding xform */
-                   if (dst[i+ii].xform[xf].padding==1)
-                      continue;
-                     
-                   /* Fan */
-                   if (dst[i+ii].xform[xf].var[VAR_FAN]>0) {
-                      dst[i].xform[xf].var[VAR_FAN] = 1.0;
-                      fnd++;
-                   }
-
-                   /* Rings */
-                   if (dst[i+ii].xform[xf].var[VAR_RINGS]>0) {
-                      dst[i].xform[xf].var[VAR_RINGS] = 1.0;
-                      fnd++;
-                   }
-
-                }
-               
-                if (fnd>0) {
-                   /* Set the coefs appropriately */
-                   dst[i].xform[xf].c[0][0] = 0.0;
-                   dst[i].xform[xf].c[0][1] = 1.0;
-                   dst[i].xform[xf].c[1][0] = 1.0;
-                   dst[i].xform[xf].c[1][1] = 0.0;
-                   dst[i].xform[xf].c[2][0] = 0.0;
-                   dst[i].xform[xf].c[2][1] = 0.0;               
-                }
-             }
-                                          
-             /* If we still have no matches, switch back to linear */
-             if (fnd==0)
-
-                dst[i].xform[xf].var[VAR_LINEAR] = 1.0;
-
-             else if (fnd>0) {
-
-                /* Otherwise, go through and normalize the weights. */
-                normed = 0.0;
-                for (j = 0; j < flam3_nvariations; j++)
-                   normed += dst[i].xform[xf].var[j];
-                  
-                for (j = 0; j < flam3_nvariations; j++)
-                   dst[i].xform[xf].var[j] /= normed;
-
-             }         
-          }
-       } /* xforms */
-   } /* genomes */
-                              
-}
 
 
 /*
@@ -2895,8 +2680,6 @@ typedef double bucket_double[5];
 typedef double abucket_double[4];
 typedef unsigned int bucket_int[5];
 typedef unsigned int abucket_int[4];
-typedef unsigned short bucket_short[5];
-typedef unsigned short abucket_short[4];
 typedef float bucket_float[5];
 typedef float abucket_float[4];
 
@@ -2975,10 +2758,10 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
 #endif /* HAVE_GCC_ATOMIC_OPS */
 
 /* 64-bit datatypes */
-#define B_ACCUM_T double
-#define A_ACCUM_T double
 #define bucket bucket_double
 #define abucket abucket_double
+#define de_thread_helper de_thread_helper_64
+#define de_thread de_thread_64
 #define abump_no_overflow(dest, delta) do {dest += delta;} while (0)
 #define add_c_to_accum(acc,i,ii,j,jj,wid,hgt,c) do { \
    if ( (j) + (jj) >=0 && (j) + (jj) < (hgt) && (i) + (ii) >=0 && (i) + (ii) < (wid)) { \
@@ -2996,33 +2779,33 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
 #define iter_thread iter_thread_double
 #include "rect.c"
 #ifdef HAVE_GCC_64BIT_ATOMIC_OPS
-/* multi-threaded */
-#undef USE_LOCKS
-#undef bump_no_overflow
-#undef render_rectangle
-#undef iter_thread
-#define bump_no_overflow(dest, delta)  double_atomic_add(&dest, delta)
-#define render_rectangle render_rectangle_double_mt
-#define iter_thread iter_thread_double_mt
-#include "rect.c"
+   /* multi-threaded */
+   #undef USE_LOCKS
+   #undef bump_no_overflow
+   #undef render_rectangle
+   #undef iter_thread
+   #define bump_no_overflow(dest, delta)  double_atomic_add(&dest, delta)
+   #define render_rectangle render_rectangle_double_mt
+   #define iter_thread iter_thread_double_mt
+   #include "rect.c"
 #else /* !HAVE_GCC_64BIT_ATOMIC_OPS */
-#define render_rectangle_double_mt render_rectangle_double
+   #define render_rectangle_double_mt render_rectangle_double
 #endif /* HAVE_GCC_64BIT_ATOMIC_OPS */
 #undef render_rectangle
 #undef iter_thread
 #undef add_c_to_accum
-#undef A_ACCUM_T
-#undef B_ACCUM_T
 #undef bucket
 #undef abucket
 #undef bump_no_overflow
 #undef abump_no_overflow
+#undef de_thread_helper
+#undef de_thread
 
 /* 32-bit datatypes */
-#define B_ACCUM_T unsigned int
-#define A_ACCUM_T unsigned int
 #define bucket bucket_int
 #define abucket abucket_int
+#define de_thread_helper de_thread_helper_32
+#define de_thread de_thread_32
 #define abump_no_overflow(dest, delta) do { \
    if (UINT_MAX - dest > delta) dest += delta; else dest = UINT_MAX; \
 } while (0)
@@ -3044,33 +2827,33 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
 #define iter_thread iter_thread_int
 #include "rect.c"
 #ifdef HAVE_GCC_ATOMIC_OPS
-/* multi-threaded */
-#undef USE_LOCKS
-#undef bump_no_overflow
-#undef render_rectangle
-#undef iter_thread
-#define bump_no_overflow(dest, delta)  uint_atomic_add(&dest, delta)
-#define render_rectangle render_rectangle_int_mt
-#define iter_thread iter_thread_int_mt
-#include "rect.c"
+   /* multi-threaded */
+   #undef USE_LOCKS
+   #undef bump_no_overflow
+   #undef render_rectangle
+   #undef iter_thread
+   #define bump_no_overflow(dest, delta)  uint_atomic_add(&dest, delta)
+   #define render_rectangle render_rectangle_int_mt
+   #define iter_thread iter_thread_int_mt
+   #include "rect.c"
 #else /* !HAVE_GCC_ATOMIC_OPS */
-#define render_rectangle_int_mt render_rectangle_int
+   #define render_rectangle_int_mt render_rectangle_int
 #endif /* HAVE_GCC_ATOMIC_OPS */
 #undef iter_thread
 #undef render_rectangle
 #undef add_c_to_accum
-#undef A_ACCUM_T
-#undef B_ACCUM_T
 #undef bucket
 #undef abucket
 #undef bump_no_overflow
 #undef abump_no_overflow
+#undef de_thread_helper
+#undef de_thread
 
 /* experimental 32-bit datatypes (called 33) */
-#define B_ACCUM_T unsigned int
-#define A_ACCUM_T float
 #define bucket bucket_int
 #define abucket abucket_float
+#define de_thread_helper de_thread_helper_33
+#define de_thread de_thread_33
 #define abump_no_overflow(dest, delta) do {dest += delta;} while (0)
 #define add_c_to_accum(acc,i,ii,j,jj,wid,hgt,c) do { \
    if ( (j) + (jj) >=0 && (j) + (jj) < (hgt) && (i) + (ii) >=0 && (i) + (ii) < (wid)) { \
@@ -3090,77 +2873,28 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
 #define iter_thread iter_thread_float
 #include "rect.c"
 #ifdef HAVE_GCC_ATOMIC_OPS
-/* multi-threaded */
-#undef USE_LOCKS
-#undef bump_no_overflow
-#undef render_rectangle
-#undef iter_thread
-#define bump_no_overflow(dest, delta)  uint_atomic_add(&dest, delta)
-#define render_rectangle render_rectangle_float_mt
-#define iter_thread iter_thread_float_mt
-#include "rect.c"
+   /* multi-threaded */
+   #undef USE_LOCKS
+   #undef bump_no_overflow
+   #undef render_rectangle
+   #undef iter_thread
+   #define bump_no_overflow(dest, delta)  uint_atomic_add(&dest, delta)
+   #define render_rectangle render_rectangle_float_mt
+   #define iter_thread iter_thread_float_mt
+   #include "rect.c"
 #else /* !HAVE_GCC_ATOMIC_OPS */
-#define render_rectangle_float_mt render_rectangle_float
+   #define render_rectangle_float_mt render_rectangle_float
 #endif /* HAVE_GCC_ATOMIC_OPS */
 #undef iter_thread
 #undef render_rectangle
 #undef add_c_to_accum
-#undef A_ACCUM_T
-#undef B_ACCUM_T
 #undef bucket
 #undef abucket
 #undef bump_no_overflow
 #undef abump_no_overflow
+#undef de_thread_helper
+#undef de_thread
 
-
-/* 16-bit datatypes */
-#define B_ACCUM_T unsigned short
-#define A_ACCUM_T unsigned short
-#define bucket bucket_short
-#define abucket abucket_short
-#define MAXBUCKET (1<<14)
-#define abump_no_overflow(dest, delta) do { \
-   if (USHRT_MAX - dest > delta) dest += delta; else dest = USHRT_MAX; \
-} while (0)
-#define add_c_to_accum(acc,i,ii,j,jj,wid,hgt,c) do { \
-   if ( (j) + (jj) >=0 && (j) + (jj) < (hgt) && (i) + (ii) >=0 && (i) + (ii) < (wid)) { \
-   abucket *a = (acc) + ( (i) + (ii) ) + ( (j) + (jj) ) * (wid); \
-   abump_no_overflow(a[0][0],(c)[0]); \
-   abump_no_overflow(a[0][1],(c)[1]); \
-   abump_no_overflow(a[0][2],(c)[2]); \
-   abump_no_overflow(a[0][3],(c)[3]); \
-   } \
-} while (0)
-/* single-threaded */
-#define USE_LOCKS
-#define bump_no_overflow(dest, delta) do { \
-   if (USHRT_MAX - dest > delta) dest += delta; else dest = USHRT_MAX; \
-} while (0)
-#define render_rectangle render_rectangle_short
-#define iter_thread iter_thread_short
-#include "rect.c"
-#ifdef HAVE_GCC_ATOMIC_OPS
-/* multi-threaded */
-#undef USE_LOCKS
-#undef bump_no_overflow
-#undef render_rectangle
-#undef iter_thread
-#define bump_no_overflow(dest, delta)  ushort_atomic_add(&dest, delta)
-#define render_rectangle render_rectangle_short_mt
-#define iter_thread iter_thread_short_mt
-#include "rect.c"
-#else /* !HAVE_GCC_ATOMIC_OPS */
-#define render_rectangle_short_mt render_rectangle_short
-#endif /* HAVE_GCC_ATOMIC_OPS */
-#undef iter_thread
-#undef render_rectangle
-#undef add_c_to_accum
-#undef A_ACCUM_T
-#undef B_ACCUM_T
-#undef bucket
-#undef abucket
-#undef bump_no_overflow
-#undef abump_no_overflow
 
 double flam3_render_memory_required(flam3_frame *spec)
 {
@@ -3178,7 +2912,7 @@ double flam3_render_memory_required(flam3_frame *spec)
 }
 
 void bits_error(flam3_frame *spec) {
-      fprintf(stderr, "flam3: bits must be 16, 32, 33, or 64 not %d.\n",
+      fprintf(stderr, "flam3: bits must be 32, 33, or 64 not %d.\n",
          spec->bits);
       exit(1);
 }
@@ -3189,9 +2923,6 @@ void flam3_render(flam3_frame *spec, void *out,
   if (spec->nthreads == 1) {
     /* single-threaded */
     switch (spec->bits) {
-    case 16:
-      render_rectangle_short(spec, out, out_width, field, nchan, trans, stats);
-      break;
     case 32:
       render_rectangle_int(spec, out, out_width, field, nchan, trans, stats);
       break;
@@ -3208,9 +2939,6 @@ void flam3_render(flam3_frame *spec, void *out,
   } else {
     /* multi-threaded */
     switch (spec->bits) {
-    case 16:
-      render_rectangle_short_mt(spec, out, out_width, field, nchan, trans, stats);
-      break;
     case 32:
       render_rectangle_int_mt(spec, out, out_width, field, nchan, trans, stats);
       break;
