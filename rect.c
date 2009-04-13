@@ -48,7 +48,7 @@ typedef struct {
    int last_thread;
    int start_row, end_row;
    flam3_frame *spec;
-   int aborted;
+   int *aborted;
    
 } de_thread_helper;
 
@@ -172,9 +172,37 @@ static void de_thread(void *dth) {
             fprintf(stderr, "\rdensity estimation: %d/%d          ", j-str, enr-str);
             fflush(stderr);
          }
+         
+      }
+      /* Custom progress function */
+      if (dthp->spec->progress) {
+      
+         if (dthp->last_thread) {
+         
+            if ((*dthp->spec->progress)(dthp->spec->progress_parameter,
+				      100*(j-str)/(double)(enr-str), 1, 0)) {
+				   *(dthp->aborted) = 1;
+#ifdef HAVE_LIBPTHREAD
+               pthread_exit((void *)0);
+#else
+               return;
+#endif
+            }
+         } else {
+#ifdef HAVE_LIBPTHREAD
+            if (*(dthp->aborted)) pthread_exit((void *)0);
+#else
+            if (*(dthp->aborted)) return;
+#endif
+         }
       }
 
    }
+
+   #ifdef HAVE_LIBPTHREAD
+     pthread_exit((void *)0);
+   #endif
+
 }
 
 
@@ -209,7 +237,7 @@ static void iter_thread(void *fth) {
       /* sub_batch is double so this is sketchy */
       sub_batch_size = (sub_batch + SUB_BATCH_SIZE > ficp->batch_size) ?
                            (ficp->batch_size - sub_batch) : SUB_BATCH_SIZE;
-
+                           
       if (fthp->first_thread && newt != progress_timer) {
          double percent = 100.0 *
              ((((sub_batch / (double) ficp->batch_size) + ficp->temporal_sample_num)
@@ -250,8 +278,13 @@ static void iter_thread(void *fth) {
       /* Custom progress function */
       if (ficp->spec->progress) {
          if (fthp->first_thread) {
+            /* Recalculate % done, as the other calculation only updates once per second */
+            double percent = 100.0 *
+                ((((sub_batch / (double) ficp->batch_size) + ficp->temporal_sample_num)
+                / ficp->ntemporal_samples) + ficp->batch_num)/ficp->nbatches;
+         
             if ((*ficp->spec->progress)(ficp->spec->progress_parameter,
-				      sub_batch/(double)ficp->batch_size, 0, eta)) {
+				      percent, 0, eta)) {
 				   ficp->aborted = 1;
 #ifdef HAVE_LIBPTHREAD
                pthread_exit((void *)0);
@@ -815,6 +848,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
       } else {
       
          de_thread_helper *deth;
+         int de_aborted=0;
          int myspan = (fic.height-2*(oversample-1)+1);
          int swath = myspan/(spec->nthreads);
                   
@@ -834,7 +868,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
             deth[thi].k2 = k2;
             deth[thi].curve = cp.estimator_curve;
             deth[thi].spec = spec;
-            deth[thi].aborted = 0;
+            deth[thi].aborted = &de_aborted;
             if ( (spec->nthreads)>myspan) { /* More threads than rows */
                deth[thi].start_row=0;
                if (thi==spec->nthreads-1) {
@@ -880,6 +914,11 @@ static void render_rectangle(flam3_frame *spec, void *out,
 
          free(deth);
                   
+         if (de_aborted) {
+            if (verbose) fprintf(stderr, "\naborted!\n");
+            goto done;
+         }
+
       } /* End density estimation loop */
 
 
