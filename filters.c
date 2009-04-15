@@ -244,7 +244,7 @@ int flam3_create_spatial_filter(flam3_frame *spec, int field, double **filter) {
       adjust = 1.0;
 
    /* Calling function MUST FREE THE RETURNED KERNEL, lest ye leak memory */
-   (*filter) = (double *)malloc(sizeof(double) * fwidth * fwidth);
+   (*filter) = (double *)calloc(fwidth * fwidth,sizeof(double));
 
    /* fill in the coefs */
    for (i = 0; i < fwidth; i++)
@@ -321,8 +321,8 @@ flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double c
    de_half_size = (de_row_size-1)/2;
    de.kernel_size = (de_half_size+1)*(2+de_half_size)/2;
 
-   de.filter_coefs = (double *) malloc (de_max_ind * de.kernel_size * sizeof(double));
-   de.filter_widths = (double *) malloc (de_max_ind * sizeof(double));
+   de.filter_coefs = (double *) calloc (de_max_ind * de.kernel_size,sizeof(double));
+   de.filter_widths = (double *) calloc (de_max_ind,sizeof(double));
 
    /* Generate the filter coefficients */
    de.max_filter_index = 0;
@@ -430,7 +430,7 @@ double flam3_create_temporal_filter(int numsteps, int filter_type, double filter
       
    /* Define the temporal deltas */   
    for (i = 0; i < numsteps; i++)
-      deltas[i] = ((double)i /(double)(numsteps - 1) - 1.0)*filter_width;
+      deltas[i] = ((double)i /(double)(numsteps - 1) - 0.5)*filter_width;
       
    /* Define the filter coefs */
    if (flam3_temporal_exp == filter_type) {
