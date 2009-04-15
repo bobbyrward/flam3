@@ -267,7 +267,7 @@ void spin(int frame, double blend, flam3_genome *parent, flam3_genome *templ)
 
    /* Force linear interpolation - unsure if this is still necessary     */
    /* I believe we put this in so that older clients could render frames */
-   //result->interpolation_type = flam3_inttype_linear;
+   result->interpolation_type = flam3_inttype_linear;
 
    /* Create the edit doc xml */
    sprintf(action,"rotate %g",blend*360.0);
@@ -320,6 +320,7 @@ void spin_inter(int frame, double blend, int seqflag, flam3_genome *parents, fla
 
    /* Set genome attributes */
    result->time = (double)frame;
+   result->interpolation_type = flam3_inttype_linear;
 
    /* Create the edit doc xml */
    sprintf(action,"interpolate %g",blend*360.0);
@@ -625,8 +626,8 @@ main(argc, argv)
    memset(&selp1, 0, sizeof(flam3_genome));
 
    if (1 != argc) {
-       docstring();
-       exit(0);
+      docstring();
+      exit(0);
    }
 
    /* Init random number generators */
@@ -679,68 +680,68 @@ main(argc, argv)
 
    } else {
    
-        if (use_vars) {
-           /* Parse comma-separated list of variations to use */
-           var_tok = strtok(use_vars,",");
-           ivars[num_ivars++] = atoi(var_tok);
-           while(1) {
-              var_tok = strtok(NULL,",");
+      if (use_vars) {
+         /* Parse comma-separated list of variations to use */
+         var_tok = strtok(use_vars,",");
+         ivars[num_ivars++] = atoi(var_tok);
+         while(1) {
+            var_tok = strtok(NULL,",");
 
-              if (var_tok==NULL)
-                 break;
+            if (var_tok==NULL)
+               break;
 
-              ivars[num_ivars++] = atoi(var_tok);
+            ivars[num_ivars++] = atoi(var_tok);
 
-              if (num_ivars==max_specified_vars) {
-                 fprintf(stderr,"Maximum number of user-specified variations exceeded.  Truncating.\n");
-                 break;
-              }
-           }
+            if (num_ivars==max_specified_vars) {
+               fprintf(stderr,"Maximum number of user-specified variations exceeded.  Truncating.\n");
+               break;
+            }
+         }
 
-           /* Error checking */
-           for (i=0;i<num_ivars;i++) {
-              if (ivars[i]<0 || ivars[i]>=flam3_nvariations) {
-                 fprintf(stderr,"specified variation list includes bad value. (%d)\n",ivars[i]);
-                 exit(1);
-              }
-           }
-        } else if (dont_use_vars) {
-           /* Parse comma-separated list of variations NOT to use */
-           var_tok = strtok(dont_use_vars,",");
-           novars[num_novars++] = atoi(var_tok);
-           while(1) {
-              var_tok = strtok(NULL,",");
+         /* Error checking */
+         for (i=0;i<num_ivars;i++) {
+            if (ivars[i]<0 || ivars[i]>=flam3_nvariations) {
+               fprintf(stderr,"specified variation list includes bad value. (%d)\n",ivars[i]);
+               exit(1);
+            }
+         }
+      } else if (dont_use_vars) {
+         /* Parse comma-separated list of variations NOT to use */
+         var_tok = strtok(dont_use_vars,",");
+         novars[num_novars++] = atoi(var_tok);
+         while(1) {
+            var_tok = strtok(NULL,",");
 
-              if (var_tok==NULL)
-                 break;
+            if (var_tok==NULL)
+               break;
 
-              novars[num_novars++] = atoi(var_tok);
+            novars[num_novars++] = atoi(var_tok);
 
-              if (num_novars==max_specified_vars) {
-                 fprintf(stderr,"Maximum number of user-specified variations exceeded.  Truncating.\n");
-                 break;
-              }
-           }
-           
-           /* Loop over the novars and set ivars to the complement */
-           for (i=0;i<flam3_nvariations;i++) {
-              for (j=0;j<num_novars;j++) {
-                 if (novars[j] == i)
-                    break;
-              }
-              if (j==num_novars)
-                 ivars[num_ivars++] = i;
-           }
-        }
+            if (num_novars==max_specified_vars) {
+               fprintf(stderr,"Maximum number of user-specified variations exceeded.  Truncating.\n");
+               break;
+            }
+         }
+         
+         /* Loop over the novars and set ivars to the complement */
+         for (i=0;i<flam3_nvariations;i++) {
+            for (j=0;j<num_novars;j++) {
+               if (novars[j] == i)
+                  break;
+            }
+            if (j==num_novars)
+               ivars[num_ivars++] = i;
+         }
+      }
    }
    
    if (1 < (!!mutate + !!(cross0 || cross1) +
        !!inter + !!rotate + !!clone + !!strip )) {
       fprintf(stderr,
-      "can only specify one of mutate, clone, "
-         "cross, rotate, strip, or inter.\n");
+      "can only specify one of mutate, clone, cross, rotate, strip, or inter.\n");
       exit(1);
    }
+   
    if ( (!cross0) ^ (!cross1) ) {
       fprintf(stderr, "must specify both crossover arguments.\n");
       exit(1);
@@ -775,7 +776,7 @@ main(argc, argv)
    if (cross1) parent1 = string_to_cp(cross1, &parent1_n);
    if (strip) parent0 = string_to_cp(strip, &parent0_n);
 
-   if (clone_all) {
+   if (clone_all) { /* Keeps motion intact */
       flam3_genome *cp;
       FILE *fp;
 
@@ -797,7 +798,7 @@ main(argc, argv)
       exit(0);
    }
    
-   if (animate) {
+   if (animate) { /* Ignore motion */
       flam3_genome *cps;
       flam3_genome interpolated;
       int first_frame,last_frame;
@@ -822,13 +823,13 @@ main(argc, argv)
       }
 
       if (!getenv("time") && !getenv("frame")) {
-	  if (!getenv("begin"))
-	      first_frame = (int) cps[0].time;
+         if (!getenv("begin"))
+            first_frame = (int) cps[0].time;
                
-	  if (!getenv("end")) {
-	      last_frame = (int) cps[ncp-1].time;
-	      if (last_frame < first_frame) last_frame = first_frame;
-	  }
+            if (!getenv("end")) {
+               last_frame = (int) cps[ncp-1].time;
+               if (last_frame < first_frame) last_frame = first_frame;
+            }
       }
 
       printf("<animate version=\"FLAM3-%s\">\n", flam3_version());
@@ -860,7 +861,7 @@ main(argc, argv)
    }
 
 
-   if (sequence) {
+   if (sequence) { /* Motion is applied in spin/spin_inter, do not print */
       flam3_genome *cp;
       double blend, spread;
       int seqflag;
@@ -927,7 +928,7 @@ main(argc, argv)
       exit(0);
    }
 
-   if (inter || rotate) {
+   if (inter || rotate) { /* Motion applied in result, do not print */
       flam3_genome *cp;
       double blend, spread;
       char *fname = inter?inter:rotate;
@@ -979,7 +980,7 @@ main(argc, argv)
       exit(0);
    }
 
-   if (strip) {
+   if (strip) { /* Do not print motion */
       flam3_genome *cp;
       FILE *fp;
 
@@ -994,22 +995,26 @@ main(argc, argv)
          exit(1);
       }
       cp = flam3_parse_from_file(fp, strip, flam3_defaults_on, &ncp);
-      if (NULL == cp) exit(1);
-      if (enclosed) printf("<pick version=\"FLAM3-%s\">\n", flam3_version());
-      for (i = 0; i < ncp; i++) {
-   double old_center[2];
-   old_center[0] = cp[i].center[0];
-   old_center[1] = cp[i].center[1];
-   cp[i].height /= nframes;
-   cp[i].center[1] = cp[i].center[1] - ((nframes - 1) * cp[i].height) /
-     (2 * cp[i].pixels_per_unit * pow(2.0, cp[i].zoom));
-   cp[i].center[1] += cp[i].height * frame / ( cp[i].pixels_per_unit * pow(2.0,cp[i].zoom) );
-   rotate_by(cp[i].center, old_center, cp[i].rotate);
 
-   if (templ) flam3_apply_template(&cp[i], templ);
-   offset(&cp[i]);
-   gprint(&cp[i], 1);
+      if (NULL == cp) exit(1);
+
+      if (enclosed) printf("<pick version=\"FLAM3-%s\">\n", flam3_version());
+
+      for (i = 0; i < ncp; i++) {
+         double old_center[2];
+         old_center[0] = cp[i].center[0];
+         old_center[1] = cp[i].center[1];
+         cp[i].height /= nframes;
+         cp[i].center[1] = cp[i].center[1] - ((nframes - 1) * cp[i].height) /
+            (2 * cp[i].pixels_per_unit * pow(2.0, cp[i].zoom));
+         cp[i].center[1] += cp[i].height * frame / ( cp[i].pixels_per_unit * pow(2.0,cp[i].zoom) );
+         rotate_by(cp[i].center, old_center, cp[i].rotate);
+
+         if (templ) flam3_apply_template(&cp[i], templ);
+         offset(&cp[i]);
+         gprint(&cp[i], 1);
       }
+
       if (enclosed) printf("</pick>\n");
       exit(0);
    }
@@ -1024,20 +1029,21 @@ main(argc, argv)
    image = (unsigned char *) malloc(3 * cp_orig.width * cp_orig.height);
 
    for (rep = 0; rep < repeat; rep++) {
-     notes[0] = 0;
+   
+      notes[0] = 0;
 
-       if (verbose) {
-      fprintf(stderr, "flame = %d/%d..", rep+1, repeat);
-       }
+      if (verbose)
+         fprintf(stderr, "flame = %d/%d..", rep+1, repeat);
 
       count = 0;
 
-      if (clone) {
+      if (clone) { /* Keep motion intact, print it */
 
          /* Action is 'clone' with trunc_vars concat */
          sprintf(action,"clone");
-	 if (getenv("clone_action"))
-	   sprintf(action,"clone %s", getenv("clone_action"));
+         
+         if (getenv("clone_action"))
+            sprintf(action,"clone %s", getenv("clone_action"));
 
          flam3_copy(&selp0, &(parent0[random()%parent0_n]));
          flam3_copy(&cp_save, &selp0);
@@ -1051,7 +1057,7 @@ main(argc, argv)
          int did_color;
 
          do {
-	   notes[0] = 0;
+            notes[0] = 0;
             if (verbose) fprintf(stderr, ".");
             did_color = 0;
             f.time = (double) 0.0;
@@ -1068,7 +1074,8 @@ main(argc, argv)
                aselp0 = &selp0;
                aselp1 = NULL;
 
-               if (r < 0.1) {
+               if (r < 0.1) { /* Create random flame and subst variation coefs for all xforms */
+               
                   int done = 0;
                   if (debug) fprintf(stderr, "mutating variation\n");
                   sprintf(action,"mutate variation");
@@ -1078,33 +1085,25 @@ main(argc, argv)
                      /* to replace those in the original              */
                      flam3_random(&mutation, ivars, num_ivars, sym, cp_orig.num_xforms);
                      for (i = 0; i < cp_orig.num_xforms; i++) {
+                        for (j = 0; j < flam3_nvariations; j++) {
+                           if (cp_orig.xform[i].var[j] != mutation.xform[i].var[j]) {
+                              cp_orig.xform[i].var[j] = mutation.xform[i].var[j];
 
-                        /* Replace if density > 0 or this is the final xform */
-                        /*if (cp_orig.xform[i].density > 0.0 || (cp_orig.final_xform_enable==1 && cp_orig.final_xform_index==i)) {*/
-                           for (j = 0; j < flam3_nvariations; j++) {
-                              if (cp_orig.xform[i].var[j] != mutation.xform[i].var[j]) {
-                                 cp_orig.xform[i].var[j] = mutation.xform[i].var[j];
+                              /* Copy parameters for this variation only */
+                              flam3_copy_params(&(cp_orig.xform[i]),&(mutation.xform[i]),j);
 
-                                 /* Copy parameters for this variation only */
-                                 flam3_copy_params(&(cp_orig.xform[i]),&(mutation.xform[i]),j);
-
-                                 done = 1;
-                              }
+                              done = 1;
                            }
-                        /*}*/
+                        }
                      }
                   } while (!done);
                } else if (r < 0.3) {
                   // change one xform coefs but not the vars
+                  /* Retains motion attributes */
                   int xf, nxf = 0;
                   if (debug) fprintf(stderr, "mutating one xform\n");
                   sprintf(action,"mutate xform");
                   flam3_random(&mutation, ivars, num_ivars, sym, 2);
-                  /*for (i = 0; i < cp_orig.num_xforms; i++) {
-                     if (cp_orig.xform[i].density > 0.0) {
-                        nxf++;
-                     }
-                  }*/
 
                   nxf = cp_orig.num_xforms;
 
@@ -1112,6 +1111,7 @@ main(argc, argv)
                      fprintf(stderr, "no xforms in control point.\n");
                      exit(1);
                   }
+
                   xf = random()%nxf;
 
                   // if only two xforms, then change only the translation part
@@ -1121,20 +1121,22 @@ main(argc, argv)
                   } else {
                      for (i = 0; i < 3; i++)
                         for (j = 0; j < 2; j++)
-                        cp_orig.xform[xf].c[i][j] = mutation.xform[0].c[i][j];
+                           cp_orig.xform[xf].c[i][j] = mutation.xform[0].c[i][j];
                   }
                } else if (r < 0.5) {
+                  /* Retains motion */
                   if (debug) fprintf(stderr, "adding symmetry\n");
                   sprintf(action,"mutate symmetry");
                   flam3_add_symmetry(&cp_orig, 0);
                } else if (r < 0.6) {
+                  /* Retains motion */
                   int b = 1 + random()%6;
                   int same = random()&3;
                   if (debug) fprintf(stderr, "setting post xform\n");
                   sprintf(action,"mutate post");
                   for (i = 0; i < cp_orig.num_xforms; i++) {
                      int copy = (i > 0) && same;
-/*                     if (cp_orig.xform[i].density == 0.0) continue;*/
+
                      if (copy) {
                         for (j = 0; j < 3; j++) {
                            cp_orig.xform[i].post[j][0] = cp_orig.xform[0].post[j][0];
@@ -1204,6 +1206,7 @@ main(argc, argv)
                      }
                   }
                } else if (r < 0.7) {
+                  /* Retains motion */
                   double s = flam3_random01();
                   did_color = 1;
                   // change just the color
@@ -1219,13 +1222,10 @@ main(argc, argv)
                      sprintf(action,"mutate color palette");
                   }
                } else if (r < 0.8) {
+                  /* retains motion */
                   int nx = 0;
                   if (debug) fprintf(stderr, "deleting an xform\n");
                   sprintf(action,"mutate delete");
-/*                  for (i = 0; i < cp_orig.num_xforms; i++) {
-                     if (cp_orig.xform[i].density > 0.0)
-                        nx++;
-                  }*/
 
                   nx = cp_orig.num_xforms;
 
@@ -1234,16 +1234,6 @@ main(argc, argv)
                      nx = random()%nx;
                      flam3_delete_xform(&cp_orig,nx);
 
-/*                  if (nx > 1) {
-                     nx = random()%nx;
-                     for (i = 0; i < cp_orig.num_xforms; i++) {
-                        if (nx == ny) {
-                           cp_orig.xform[i].density = 0;
-                           break;
-                        }
-                        if (cp_orig.xform[i].density > 0.0)
-                           ny++;
-                     }*/
                   } else {
                      if (verbose)
                         fprintf(stderr, "not enough xforms to delete one.\n");
@@ -1256,20 +1246,18 @@ main(argc, argv)
 
                   // change all the coefs by a little bit
                   for (x = 0; x < cp_orig.num_xforms; x++) {
-/*                     if (cp_orig.xform[x].density > 0.0) {*/
-                        for (i = 0; i < 3; i++) {
-                           for (j = 0; j < 2; j++) {
-                              cp_orig.xform[x].c[i][j] += speed * mutation.xform[x].c[i][j];
+                     for (i = 0; i < 3; i++) {
+                        for (j = 0; j < 2; j++) {
+                           cp_orig.xform[x].c[i][j] += speed * mutation.xform[x].c[i][j];
                            /* Eventually, we can mutate the parametric variation coefs here. */
-                           }
                         }
-/*                     }*/
+                     }
                   }
                }
 
                if (random()&1) {
                   double bmin[2], bmax[2];
-        flam3_estimate_bounding_box(&cp_orig, 0.01, 100000, bmin, bmax, &f.rc);
+                  flam3_estimate_bounding_box(&cp_orig, 0.01, 100000, bmin, bmax, &f.rc);
                   cp_orig.center[0] = (bmin[0] + bmax[0]) / 2.0;
                   cp_orig.center[1] = (bmin[1] + bmax[1]) / 2.0;
                   cp_orig.rot_center[0] = cp_orig.center[0];
@@ -1280,12 +1268,12 @@ main(argc, argv)
                   
                }
 
-	       if (cp_orig.flame_name[0]) {
-		   char tm[flam3_name_len+1];
-		   strncpy(tm, cp_orig.flame_name, flam3_name_len);
-		   snprintf(cp_orig.flame_name, flam3_name_len,
-			    "%d of %s", rep, tm);
-	       }
+               if (cp_orig.flame_name[0]) {
+                  char tm[flam3_name_len+1];
+                  strncpy(tm, cp_orig.flame_name, flam3_name_len);
+                  snprintf(cp_orig.flame_name, flam3_name_len,
+                     "%d of %s", rep, tm);
+               }
 
             } else if (cross0) {
                int i0, i1, rb, used_parent;
@@ -1321,86 +1309,88 @@ main(argc, argv)
                aselp0 = &selp0;
                aselp1 = &selp1;
 
-	       note("cross");
-	       note_int(i0);
-	       note_int(i1);
+               note("cross");
+               note_int(i0);
+               note_int(i1);
 
                if (!strcmp(method, "alternate")) {
-         int got0, got1;
-         char *trystr;
+                  int got0, got1;
+                  char *trystr;
 
-         trystr = calloc(4 * (parent1[i1].num_xforms + parent0[i0].num_xforms), sizeof(char));
+                  trystr = calloc(4 * (parent1[i1].num_xforms + parent0[i0].num_xforms), sizeof(char));
 
                   /* each xform from a random parent,
                   possible for one to be excluded */
-         do {
+                  do {
 
-             trystr[0] = 0;
-             got0 = got1 = 0;
-             rb = rbit();
-             sprintf(ministr," %d:",rb);
-             strcat(trystr,ministr);
+                     trystr[0] = 0;
+                     got0 = got1 = 0;
+                     rb = rbit();
+                     sprintf(ministr," %d:",rb);
+                     strcat(trystr,ministr);
 
-             /* Copy the parent, sorting the final xform to the end if it's present. */
-             if (rb)
-            flam3_copyx(&cp_orig, &(parent1[i1]),
-                   parent1[i1].num_xforms - (parent1[i1].final_xform_index > 0),
-                   parent1[i1].final_xform_enable);
-             else
-            flam3_copyx(&cp_orig, &(parent0[i0]),
-                   parent0[i0].num_xforms - (parent0[i0].final_xform_index > 0),
-                   parent0[i0].final_xform_enable);
+                     /* Copy the parent, sorting the final xform to the end if it's present. */
+                     if (rb)
+                        flam3_copyx(&cp_orig, &(parent1[i1]),
+                           parent1[i1].num_xforms - (parent1[i1].final_xform_index > 0),
+                           parent1[i1].final_xform_enable);
+                     else
+                        flam3_copyx(&cp_orig, &(parent0[i0]),
+                           parent0[i0].num_xforms - (parent0[i0].final_xform_index > 0),
+                           parent0[i0].final_xform_enable);
 
-             used_parent = rb;
+                     used_parent = rb;
 
-             /* Only replace non-final xforms */
+                     /* Only replace non-final xforms */
 
-             for (i = 0; i < cp_orig.num_xforms - cp_orig.final_xform_enable; i++) {
-            rb = rbit();
+                     for (i = 0; i < cp_orig.num_xforms - cp_orig.final_xform_enable; i++) {
+                        rb = rbit();
 
-            /* Replace xform if bit is 1 */
-            if (rb==1) {
-                if (used_parent==0) {
-               if (i < parent1[i1].num_xforms && parent1[i1].xform[i].density > 0) {
-                   cp_orig.xform[i] = parent1[i1].xform[i];
-                   sprintf(ministr," 1");
-                   got1 = 1;
-               } else {
-                   sprintf(ministr," 0");
-                   got0 = 1;
-               }
-                } else {
-               if (i < parent0[i0].num_xforms && parent0[i0].xform[i].density > 0) {
-                   cp_orig.xform[i] = parent0[i0].xform[i];
-                   sprintf(ministr," 0");
-                   got0 = 1;
-               } else {
-                   sprintf(ministr," 1");
-                   got1 = 1;
-               }
-                }
-            } else {
-                sprintf(ministr," %d",used_parent);
-                if (used_parent)
-               got1 = 1;
-                else
-               got0 = 1;
-            }
-            strcat(trystr,ministr);
-             }
+                        /* Replace xform if bit is 1 */
+                        if (rb==1) {
+                           if (used_parent==0) {
+                              if (i < parent1[i1].num_xforms && parent1[i1].xform[i].density > 0) {
+                                 flam3_copy_xform(&cp_orig.xform[i],&parent1[i1].xform[i]);
+                                 sprintf(ministr," 1");
+                                 got1 = 1;
+                              } else {
+                                 sprintf(ministr," 0");
+                                 got0 = 1;
+                              }
+                           } else {
+                              if (i < parent0[i0].num_xforms && parent0[i0].xform[i].density > 0) {
+                                 flam3_copy_xform(&cp_orig.xform[i],&parent0[i0].xform[i]);
+                                 sprintf(ministr," 0");
+                                 got0 = 1;
+                              } else {
+                                 sprintf(ministr," 1");
+                                 got1 = 1;
+                              }
+                           }
+                        } else {
+                           sprintf(ministr," %d",used_parent);
+                           if (used_parent)
+                              got1 = 1;
+                           else
+                              got0 = 1;
+                        }
+
+                        strcat(trystr,ministr);
+                     }
              
-            if (used_parent==0 && parent0[i0].final_xform_enable)
-               got0 = 1;
-            else if (used_parent==1 && parent1[i1].final_xform_enable)
-               got1 = 1;
+                     if (used_parent==0 && parent0[i0].final_xform_enable)
+                        got0 = 1;
+                     else if (used_parent==1 && parent1[i1].final_xform_enable)
+                        got1 = 1;
                
-         } while ((i > 1) && !(got0 && got1));
+                  } while ((i > 1) && !(got0 && got1));
 
-         add_to_action(action,trystr);
-         free(trystr);
+                  add_to_action(action,trystr);
+                  free(trystr);
 
                } else if (!strcmp(method, "interpolate")) {
                   /* linearly interpolate somewhere between the two */
+                  /* do not print motion elements */
                   flam3_genome parents[2];
                   double t = flam3_random01();
 
@@ -1429,7 +1419,7 @@ main(argc, argv)
 
                } else {
 	       
-	          flam3_xform mycopy;
+                  flam3_xform mycopy;
                   /* union */
                   flam3_copy(&cp_orig, &(parent0[i0]));
 
@@ -1440,16 +1430,17 @@ main(argc, argv)
                      if (parent1[i1].final_xform_index == j)		     
                         continue;
                      flam3_add_xforms(&cp_orig, 1, 0, 0);
-                     cp_orig.xform[cp_orig.num_xforms-1] = parent1[i1].xform[j];
+                     flam3_copy_xform(&cp_orig.xform[cp_orig.num_xforms-1],&parent1[i1].xform[j]);
                   }
 		  
-		  /* Put the final xform last (if there is one) */
-		  if (cp_orig.final_xform_index >= 0) {
-		     mycopy = cp_orig.xform[cp_orig.final_xform_index];
-		     cp_orig.xform[cp_orig.final_xform_index] = cp_orig.xform[cp_orig.num_xforms-1];
-		     cp_orig.xform[cp_orig.num_xforms-1] = mycopy;
-		     cp_orig.final_xform_index = cp_orig.num_xforms-1;
-	          }
+                  /* Put the final xform last (if there is one) */
+                  /* We do not need to do complicated xform copies here since we're just moving them around */
+                  if (cp_orig.final_xform_index >= 0) {
+                     mycopy = cp_orig.xform[cp_orig.final_xform_index];
+                     cp_orig.xform[cp_orig.final_xform_index] = cp_orig.xform[cp_orig.num_xforms-1];
+                     cp_orig.xform[cp_orig.num_xforms-1] = mycopy;
+                     cp_orig.final_xform_index = cp_orig.num_xforms-1;
+                  }
 		     
                }
 
@@ -1492,13 +1483,10 @@ main(argc, argv)
                   }
                }
 
-	       if (parent0[i0].flame_name[0] ||
-		   parent1[i1].flame_name[0]) {
-		   snprintf(cp_orig.flame_name, flam3_name_len,
-			    "%d of %s x %s", rep,
-			    parent0[i0].flame_name,
-			    parent1[i1].flame_name);
-	       }
+               if (parent0[i0].flame_name[0] || parent1[i1].flame_name[0]) {
+                  snprintf(cp_orig.flame_name, flam3_name_len, "%d of %s x %s", 
+                           rep, parent0[i0].flame_name, parent1[i1].flame_name);
+               }
 
             } else {
                sprintf(action,"random");
@@ -1508,28 +1496,28 @@ main(argc, argv)
                if (1) {
                   double bmin[2], bmax[2];
                   flam3_estimate_bounding_box(&cp_orig, 0.01, 100000, bmin, bmax, &f.rc);
-		  if (flam3_random01() < 0.3) {
-		    cp_orig.center[0] = (bmin[0] + bmax[0]) / 2.0;
-		    cp_orig.center[1] = (bmin[1] + bmax[1]) / 2.0;
-		    add_to_action(action," recentered");
-		  } else {
-		    double mix0, mix1;
-		    if (flam3_random_bit()) {
-		      mix0 = golden_bit() + flam3_random11()/5;
-		      mix1 = golden_bit();
-		      add_to_action(action," reframed0");
-		    } else if (flam3_random_bit()) {
-		      mix0 = golden_bit();
-		      mix1 = golden_bit() + flam3_random11()/5;
-		      add_to_action(action," reframed1");
-		    } else {
-		      mix0 = golden_bit() + flam3_random11()/5;
-		      mix1 = golden_bit() + flam3_random11()/5;
-		      add_to_action(action," reframed2");
-		    }
-		    cp_orig.center[0] = mix0 * bmin[0] + (1-mix0)*bmax[0];
-		    cp_orig.center[1] = mix1 * bmin[1] + (1-mix1)*bmax[1];
-		  }
+                  if (flam3_random01() < 0.3) {
+                     cp_orig.center[0] = (bmin[0] + bmax[0]) / 2.0;
+                     cp_orig.center[1] = (bmin[1] + bmax[1]) / 2.0;
+                     add_to_action(action," recentered");
+                  } else {
+                     double mix0, mix1;
+                     if (flam3_random_bit()) {
+                        mix0 = golden_bit() + flam3_random11()/5;
+                        mix1 = golden_bit();
+                        add_to_action(action," reframed0");
+                     } else if (flam3_random_bit()) {
+                        mix0 = golden_bit();
+                        mix1 = golden_bit() + flam3_random11()/5;
+                        add_to_action(action," reframed1");
+                     } else {
+                        mix0 = golden_bit() + flam3_random11()/5;
+                        mix1 = golden_bit() + flam3_random11()/5;
+                        add_to_action(action," reframed2");
+                     }
+                     cp_orig.center[0] = mix0 * bmin[0] + (1-mix0)*bmax[0];
+                     cp_orig.center[1] = mix1 * bmin[1] + (1-mix1)*bmax[1];
+                  }
                   cp_orig.rot_center[0] = cp_orig.center[0];
                   cp_orig.rot_center[1] = cp_orig.center[1];
                   cp_orig.pixels_per_unit = cp_orig.width / (bmax[0] - bmin[0]);
@@ -1541,13 +1529,14 @@ main(argc, argv)
 
             truncate_variations(&cp_orig, 5, action);
 
-	    if (!did_color && random()&1) {
-	        if (debug)
-	           fprintf(stderr,"improving colors...\n");
-	        improve_colors(&cp_orig, 100, 0, 10);
-	        //strcat(action," improved colors");
-	        add_to_action(action," improved colors");
-	    }
+            if (!did_color && random()&1) {
+               if (debug)
+                  fprintf(stderr,"improving colors...\n");
+
+               improve_colors(&cp_orig, 100, 0, 10);
+               //strcat(action," improved colors");
+               add_to_action(action," improved colors");
+            }
 
             cp_orig.edits = create_new_editdoc(action, aselp0, aselp1);
             flam3_copy(&cp_save, &cp_orig);
@@ -1602,12 +1591,12 @@ main(argc, argv)
       cp_save.time = (double)rep;
 
       if (1) {
-	char *maxforms = getenv("maxforms");
-	if (maxforms && atoi(maxforms)) {
-	  cp_save.symmetry = 0;
-	  while (cp_save.num_xforms > atoi(maxforms))
-	    flam3_delete_xform(&cp_save, cp_save.num_xforms - 1);
-	}
+         char *maxforms = getenv("maxforms");
+         if (maxforms && atoi(maxforms)) {
+            cp_save.symmetry = 0;
+            while (cp_save.num_xforms > atoi(maxforms))
+               flam3_delete_xform(&cp_save, cp_save.num_xforms - 1);
+         }
       }
 
       gprint(&cp_save, 1);
