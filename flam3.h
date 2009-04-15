@@ -496,6 +496,7 @@ typedef struct {
 void flam3_add_motion_element(flam3_xform *xf);
 void flam3_add_xforms(flam3_genome *cp, int num_to_add, int interp_padding, int final_flag);
 void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete);
+void flam3_copy_xform(flam3_xform *dest, flam3_xform *src);
 void flam3_copy(flam3_genome *dest, flam3_genome *src);
 void flam3_copyx(flam3_genome *dest, flam3_genome *src, int num_std, int num_final);
 void flam3_copy_params(flam3_xform *dest, flam3_xform *src, int varn);
@@ -525,6 +526,7 @@ void flam3_interpolate_n(flam3_genome *result, int ncp, flam3_genome *cpi, doubl
 
 /* print genome to given file with extra_attributes if not NULL */
 void flam3_print(FILE *f, flam3_genome *g, char *extra_attributes, int print_edits);
+void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, double *chaos_row, int motion_flag);
 char *flam3_print_to_string(flam3_genome *cp);
 
 /* ivars is a list of variations to use, or flam3_variation_random     */

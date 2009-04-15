@@ -331,7 +331,7 @@ flam3_genome *sheep_loop(flam3_genome *cp, double blend) {
    int i;
 
    /* Allocate the genome - this must be freed by calling function */
-   result = malloc(sizeof(flam3_genome));
+   result = calloc(1,sizeof(flam3_genome));
    
    /* Clear it */
    clear_cp(result,flam3_defaults_on);
@@ -373,7 +373,7 @@ flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag) {
    memset(prealign, 0, 2*sizeof(flam3_genome));
 
    /* Allocate the memory for the result */
-   result = malloc(sizeof(flam3_genome));
+   result = calloc(1,sizeof(flam3_genome));
 
    /*
     * Insert motion magic here :
@@ -913,7 +913,7 @@ void flam3_delete_motion_elements(flam3_xform *xf) {
       xf->num_motion = 0;
    }
    
-}   
+}
 
 /* Xform support functions */
 void flam3_add_xforms(flam3_genome *thiscp, int num_to_add, int interp_padding, int final_flag) {
@@ -982,7 +982,6 @@ void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete) {
    int nth_std=-1;
    int num_std = thiscp->num_xforms - (thiscp->final_xform_index >= 0);
 
-   /* Handle the final xform index */
    if (thiscp->final_xform_index != idx_to_delete) {
       /* We're going to delete the nth std xform. */
 
@@ -1007,8 +1006,8 @@ void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete) {
          
       }
    }      
-      
    
+   /* Handle the final xform index */
    if (thiscp->final_xform_index == idx_to_delete) {
       thiscp->final_xform_index = -1;
       thiscp->final_xform_enable = 0;
@@ -1016,7 +1015,10 @@ void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete) {
       thiscp->final_xform_index--;
    }
 
-   /* Move all of the xforms down one */
+   /* Delete the motion elements of the banished xform */
+   flam3_delete_motion_elements(&(thiscp->xform[i]));
+
+   /* Move all of the xforms down one - this does not require manual motion xform adjustment */
    for (i=idx_to_delete; i<thiscp->num_xforms-1; i++)
       thiscp->xform[i] = thiscp->xform[i+1];
 
@@ -1027,7 +1029,28 @@ void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete) {
    
 }
 
+void flam3_copy_xform(flam3_xform *dest, flam3_xform *src) {
 
+   int j;
+   
+   /* Make sure the dest doesn't have motion already */
+   if (dest->num_motion>0)
+      flam3_delete_motion_elements(dest);
+
+   /* Copy everything */
+   *dest = *src;
+   
+   /* Reset motion in dest and copy it */
+   dest->num_motion=0;
+   dest->motion=NULL;
+
+   if (src->num_motion>0) {
+      for (j=0;j<src->num_motion;j++)
+         flam3_add_motion_element(dest);
+
+      memcpy(dest->motion,src->motion,src->num_motion*sizeof(flam3_xform));
+   }
+}
 
 /* Copy one control point to another */
 void flam3_copy(flam3_genome *dest, flam3_genome *src) {
@@ -1052,33 +1075,15 @@ void flam3_copy(flam3_genome *dest, flam3_genome *src) {
    /* Add the standard xforms first */
    numstd = src->num_xforms-(src->final_xform_index>=0);
    flam3_add_xforms(dest, numstd, 0, 0);
-   for (i=0;i<numstd;i++) {
-      dest->xform[i] = src->xform[i];
-      dest->xform[i].num_motion=0;
-      dest->xform[i].motion=NULL;
-      if (src->xform[i].num_motion>0) {
-         for (j=0;j<src->xform[i].num_motion;j++)
-            flam3_add_motion_element(&dest->xform[i]);
-         memcpy(dest->xform[i].motion,src->xform[i].motion,src->xform[i].num_motion*sizeof(flam3_xform));
-      }
-      
-   }
+   for (i=0;i<numstd;i++)
+      flam3_copy_xform(&dest->xform[i], &src->xform[i]);
       
    /* Add the final x if it's present */
    if (src->final_xform_index>=0) {
       i = src->final_xform_index;
       flam3_add_xforms(dest, 1, 0, 1);
       ii = dest->final_xform_index;
-      dest->xform[ii] = src->xform[i];
-      dest->xform[ii].num_motion = 0;
-      dest->xform[ii].motion=NULL;
-      
-      if (src->xform[i].num_motion>0) {
-         for (j=0;j<src->xform[i].num_motion;j++)
-            flam3_add_motion_element(&dest->xform[ii]);
-         memcpy(dest->xform[ii].motion,src->xform[i].motion,src->xform[i].num_motion*sizeof(flam3_xform));
-      }
-      
+      flam3_copy_xform(&dest->xform[ii],&src->xform[i]);      
    }
    
    /* Also, only the pointer to the chaos array was copied.
@@ -1115,14 +1120,8 @@ void flam3_copyx(flam3_genome *dest, flam3_genome *src, int dest_std_xforms, int
    for(i=0;i<numsrcstd;i++) {
 
       /* When we copy the old xform, the pad is set to 0 */
-      dest->xform[i] = src->xform[i];
-      dest->xform[i].num_motion=0;
-      dest->xform[i].motion=NULL;
-      if (src->xform[i].num_motion>0) {
-         for (j=0;j<src->xform[i].num_motion;j++)
-            flam3_add_motion_element(&dest->xform[i]);
-         memcpy(dest->xform[i].motion,src->xform[i].motion,src->xform[i].num_motion*sizeof(flam3_xform));
-      }
+      flam3_copy_xform(&dest->xform[i],&src->xform[i]);
+
       /* Copy the initial chaos from the src - the rest are already 1 */
       memcpy(dest->chaos[i], src->chaos[i], numsrcstd*sizeof(double));
       
@@ -1133,16 +1132,10 @@ void flam3_copyx(flam3_genome *dest, flam3_genome *src, int dest_std_xforms, int
       flam3_add_xforms(dest, dest_final_xform, 1, 1);
 
       if (src->final_xform_enable > 0) {
+      
          i = src->final_xform_index;
-         dest->xform[dest->num_xforms-1] = src->xform[i];
-         dest->xform[dest->num_xforms-1].num_motion = 0;
-         dest->xform[dest->num_xforms-1].motion=NULL;
-         if (src->xform[i].num_motion>0) {
-            for (j=0;j<src->xform[i].num_motion;j++)
-               flam3_add_motion_element(&dest->xform[dest->num_xforms-1]);
-            memcpy(dest->xform[dest->num_xforms-1].motion,src->xform[i].motion,
-                   src->xform[i].num_motion*sizeof(flam3_xform));
-         }
+         
+         flam3_copy_xform(&dest->xform[dest->num_xforms-1],&src->xform[i]);
          
       } else {
          /* Interpolated-against final xforms need animate & color_speed set to 1.0 */
@@ -1608,350 +1601,15 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
    if (cp->symmetry)
       fprintf(f, "   <symmetry kind=\"%d\"/>\n", cp->symmetry);
    
-   numstd=-1;   
+   numstd = cp->num_xforms - (cp->final_xform_index>=0);
+   
    for (i = 0; i < cp->num_xforms; i++) {
-      int blob_var=0,pdj_var=0,fan2_var=0,rings2_var=0,perspective_var=0;
-      int juliaN_var=0,juliaScope_var=0,radialBlur_var=0,pie_var=0,disc2_var=0;
-      int ngon_var=0,curl_var=0,rectangles_var=0,supershape_var=0;
-      int flower_var=0,conic_var=0,parabola_var=0,bent2_var=0,bipolar_var=0;
-      int cell_var=0,cpow_var=0,curve_var=0,escher_var=0,lazys_var=0;
-      int modulus_var=0,oscope_var=0,popcorn2_var=0,separation_var=0;
-      int split_var=0,splits_var=0,stripes_var=0,wedge_var=0,wedgeJ_var=0;
-      int wedgeS_var=0,whorl_var=0,waves2_var=0;
-      if ( !(cp->symmetry &&  cp->xform[i].color_speed == 1.0 && cp->xform[i].animate == 1.0)) {
+   
+      if (i==cp->final_xform_index)   
+         flam3_print_xform(f, &cp->xform[i], 1, numstd, NULL, 0);
+      else 
+         flam3_print_xform(f, &cp->xform[i], 0, numstd, cp->chaos[i], 0);
 
-         if (i==cp->final_xform_index )
-            fprintf(f, "   <finalxform color=\"%g\" ", cp->xform[i].color);
-         else {
-            numstd++;
-            fprintf(f, "   <xform weight=\"%g\" color=\"%g\" ", cp->xform[i].density, cp->xform[i].color);
-         }
-         
-         fprintf(f, "color_speed=\"%g\" ", cp->xform[i].color_speed);
-         
-         if (i!=cp->final_xform_index)
-            fprintf(f, "animate=\"%g\" ", cp->xform[i].animate);
-            
-
-         for (j = 0; j < flam3_nvariations; j++) {
-            double v = cp->xform[i].var[j];
-            if (0.0 != v) {
-               fprintf(f, "%s=\"%g\" ", flam3_variation_names[j], v);
-               if (j==VAR_BLOB)
-                  blob_var=1;
-               else if (j==VAR_PDJ)
-                  pdj_var=1;
-               else if (j==VAR_FAN2)
-                  fan2_var=1;
-               else if (j==VAR_RINGS2)
-                  rings2_var=1;
-               else if (j==VAR_PERSPECTIVE)
-                  perspective_var=1;
-               else if (j==VAR_JULIAN)
-                  juliaN_var=1;
-               else if (j==VAR_JULIASCOPE)
-                  juliaScope_var=1;
-               else if (j==VAR_RADIAL_BLUR)
-                  radialBlur_var=1;
-               else if (j==VAR_PIE)
-                  pie_var=1;
-               else if (j==VAR_NGON)
-                  ngon_var=1;
-               else if (j==VAR_CURL)
-                  curl_var=1;
-               else if (j==VAR_RECTANGLES)
-                  rectangles_var=1;
-               else if (j==VAR_DISC2)
-                  disc2_var=1;
-               else if (j==VAR_SUPER_SHAPE)
-                  supershape_var=1;
-               else if (j==VAR_FLOWER)
-                  flower_var=1;
-               else if (j==VAR_CONIC)
-                  conic_var=1;
-               else if (j==VAR_PARABOLA)
-                  parabola_var=1;
-               else if (j==VAR_BENT2)
-                  bent2_var=1;
-               else if (j==VAR_BIPOLAR)
-                  bipolar_var=1;
-               else if (j==VAR_CELL)
-                  cell_var=1;
-               else if (j==VAR_CPOW)
-                  cpow_var=1;
-               else if (j==VAR_CURVE)
-                  curve_var=1;
-               else if (j==VAR_ESCHER)
-                  escher_var=1;
-               else if (j==VAR_LAZYSUSAN)
-                  lazys_var=1;
-               else if (j==VAR_MODULUS)
-                  modulus_var=1;
-               else if (j==VAR_OSCILLOSCOPE)
-                  oscope_var=1;
-               else if (j==VAR_POPCORN2)
-                  popcorn2_var=1;
-               else if (j==VAR_SPLIT)
-                  split_var=1;
-               else if (j==VAR_SPLITS)
-                  splits_var=1;
-               else if (j==VAR_STRIPES)
-                  stripes_var=1;
-               else if (j==VAR_WEDGE)
-                  wedge_var=1;
-               else if (j==VAR_WEDGE_JULIA)
-                  wedgeJ_var=1;
-               else if (j==VAR_WEDGE_SPH)
-                  wedgeS_var=1;
-               else if (j==VAR_WHORL)
-                  whorl_var=1;
-               else if (j==VAR_WAVES2)
-                  waves2_var=1;
-            }
-         }
-
-         if (blob_var==1) {
-            fprintf(f, "blob_low=\"%g\" ", cp->xform[i].blob_low);
-            fprintf(f, "blob_high=\"%g\" ", cp->xform[i].blob_high);
-            fprintf(f, "blob_waves=\"%g\" ", cp->xform[i].blob_waves);
-         }
-
-         if (pdj_var==1) {
-            fprintf(f, "pdj_a=\"%g\" ", cp->xform[i].pdj_a);
-            fprintf(f, "pdj_b=\"%g\" ", cp->xform[i].pdj_b);
-            fprintf(f, "pdj_c=\"%g\" ", cp->xform[i].pdj_c);
-            fprintf(f, "pdj_d=\"%g\" ", cp->xform[i].pdj_d);
-         }
-
-         if (fan2_var==1) {
-            fprintf(f, "fan2_x=\"%g\" ", cp->xform[i].fan2_x);
-            fprintf(f, "fan2_y=\"%g\" ", cp->xform[i].fan2_y);
-         }
-
-         if (rings2_var==1) {
-            fprintf(f, "rings2_val=\"%g\" ", cp->xform[i].rings2_val);
-         }
-
-         if (perspective_var==1) {
-            fprintf(f, "perspective_angle=\"%g\" ", cp->xform[i].perspective_angle);
-            fprintf(f, "perspective_dist=\"%g\" ", cp->xform[i].perspective_dist);
-         }
-
-         if (juliaN_var==1) {
-            fprintf(f, "julian_power=\"%g\" ", cp->xform[i].juliaN_power);
-            fprintf(f, "julian_dist=\"%g\" ", cp->xform[i].juliaN_dist);
-         }
-
-         if (juliaScope_var==1) {
-            fprintf(f, "juliascope_power=\"%g\" ", cp->xform[i].juliaScope_power);
-            fprintf(f, "juliascope_dist=\"%g\" ", cp->xform[i].juliaScope_dist);
-         }
-
-         if (radialBlur_var==1) {
-            fprintf(f, "radial_blur_angle=\"%g\" ", cp->xform[i].radialBlur_angle);
-         }
-
-         if (pie_var==1) {
-            fprintf(f, "pie_slices=\"%g\" ", cp->xform[i].pie_slices);
-            fprintf(f, "pie_rotation=\"%g\" ", cp->xform[i].pie_rotation);
-            fprintf(f, "pie_thickness=\"%g\" ", cp->xform[i].pie_thickness);
-         }
-
-         if (ngon_var==1) {
-            fprintf(f, "ngon_sides=\"%g\" ", cp->xform[i].ngon_sides);
-            fprintf(f, "ngon_power=\"%g\" ", cp->xform[i].ngon_power);
-            fprintf(f, "ngon_corners=\"%g\" ", cp->xform[i].ngon_corners);
-            fprintf(f, "ngon_circle=\"%g\" ", cp->xform[i].ngon_circle);
-         }
-
-         if (curl_var==1) {
-            fprintf(f, "curl_c1=\"%g\" ", cp->xform[i].curl_c1);
-            fprintf(f, "curl_c2=\"%g\" ", cp->xform[i].curl_c2);
-         }
-
-         if (rectangles_var==1) {
-            fprintf(f, "rectangles_x=\"%g\" ", cp->xform[i].rectangles_x);
-            fprintf(f, "rectangles_y=\"%g\" ", cp->xform[i].rectangles_y);
-         }
-
-         if (disc2_var==1) {
-            fprintf(f, "disc2_rot=\"%g\" ", cp->xform[i].disc2_rot);
-            fprintf(f, "disc2_twist=\"%g\" ", cp->xform[i].disc2_twist);
-         }
-
-         if (supershape_var==1) {
-            fprintf(f, "super_shape_rnd=\"%g\" ", cp->xform[i].supershape_rnd);
-            fprintf(f, "super_shape_m=\"%g\" ", cp->xform[i].supershape_m);
-            fprintf(f, "super_shape_n1=\"%g\" ", cp->xform[i].supershape_n1);
-            fprintf(f, "super_shape_n2=\"%g\" ", cp->xform[i].supershape_n2);
-            fprintf(f, "super_shape_n3=\"%g\" ", cp->xform[i].supershape_n3);
-            fprintf(f, "super_shape_holes=\"%g\" ", cp->xform[i].supershape_holes);
-         }
-
-         if (flower_var==1) {
-            fprintf(f, "flower_petals=\"%g\" ", cp->xform[i].flower_petals);
-            fprintf(f, "flower_holes=\"%g\" ", cp->xform[i].flower_holes);
-         }
-
-         if (conic_var==1) {
-            fprintf(f, "conic_eccentricity=\"%g\" ", cp->xform[i].conic_eccen);
-            fprintf(f, "conic_holes=\"%g\" ", cp->xform[i].conic_holes);
-         }
-
-         if (parabola_var==1) {
-            fprintf(f, "parabola_height=\"%g\" ", cp->xform[i].parabola_height);
-            fprintf(f, "parabola_width=\"%g\" ", cp->xform[i].parabola_width);
-         }
-         
-         if (bent2_var==1) {
-            fprintf(f, "bent2_x=\"%g\" ", cp->xform[i].bent2_x);
-            fprintf(f, "bent2_y=\"%g\" ", cp->xform[i].bent2_y);
-         }
-         
-         if (bipolar_var==1) {
-            fprintf(f, "bipolar_shift=\"%g\" ", cp->xform[i].bipolar_shift);
-         }
-
-         if (cell_var==1) {
-            fprintf(f, "cell_size=\"%g\" ", cp->xform[i].cell_size);
-         }
-
-         if (cpow_var==1) {
-            fprintf(f, "cpow_i=\"%g\" ", cp->xform[i].cpow_i);
-            fprintf(f, "cpow_r=\"%g\" ", cp->xform[i].cpow_r);
-            fprintf(f, "cpow_power=\"%g\" ", cp->xform[i].cpow_power);
-         }
-
-         if (curve_var==1) {
-            fprintf(f, "curve_xamp=\"%g\" ", cp->xform[i].curve_xamp);
-            fprintf(f, "curve_yamp=\"%g\" ", cp->xform[i].curve_yamp);
-            fprintf(f, "curve_xlength=\"%g\" ", cp->xform[i].curve_xlength);
-            fprintf(f, "curve_ylength=\"%g\" ", cp->xform[i].curve_ylength);
-         }
-
-         if (escher_var==1) {
-            fprintf(f, "escher_beta=\"%g\" ", cp->xform[i].escher_beta);
-         }
-
-         if (lazys_var==1) {
-            fprintf(f, "lazysusan_x=\"%g\" ", cp->xform[i].lazysusan_x);
-            fprintf(f, "lazysusan_y=\"%g\" ", cp->xform[i].lazysusan_y);
-            fprintf(f, "lazysusan_spin=\"%g\" ", cp->xform[i].lazysusan_spin);
-            fprintf(f, "lazysusan_space=\"%g\" ", cp->xform[i].lazysusan_space);
-            fprintf(f, "lazysusan_twist=\"%g\" ", cp->xform[i].lazysusan_twist);
-         }
-
-         if (modulus_var==1) {
-            fprintf(f, "modulus_x=\"%g\" ", cp->xform[i].modulus_x);
-            fprintf(f, "modulus_y=\"%g\" ", cp->xform[i].modulus_y);
-         }
-
-         if (oscope_var==1) {
-            fprintf(f, "oscope_separation=\"%g\" ", cp->xform[i].oscope_separation);
-            fprintf(f, "oscope_frequency=\"%g\" ", cp->xform[i].oscope_frequency);
-            fprintf(f, "oscope_amplitude=\"%g\" ", cp->xform[i].oscope_amplitude);
-            fprintf(f, "oscope_damping=\"%g\" ", cp->xform[i].oscope_damping);
-         }
-
-         if (popcorn2_var==1) {
-            fprintf(f, "popcorn2_x=\"%g\" ", cp->xform[i].popcorn2_x);
-            fprintf(f, "popcorn2_y=\"%g\" ", cp->xform[i].popcorn2_y);
-            fprintf(f, "popcorn2_c=\"%g\" ", cp->xform[i].popcorn2_c);
-         }
-
-         if (separation_var==1) {
-            fprintf(f, "separation_x=\"%g\" ", cp->xform[i].separation_x);
-            fprintf(f, "separation_y=\"%g\" ", cp->xform[i].separation_y);
-            fprintf(f, "separation_xinside=\"%g\" ", cp->xform[i].separation_xinside);
-            fprintf(f, "separation_yinside=\"%g\" ", cp->xform[i].separation_yinside);
-         }
-
-         if (split_var==1) {
-            fprintf(f, "split_xsize=\"%g\" ", cp->xform[i].split_xsize);
-            fprintf(f, "split_ysize=\"%g\" ", cp->xform[i].split_ysize);
-         }
-
-         if (splits_var==1) {
-            fprintf(f, "splits_x=\"%g\" ", cp->xform[i].splits_x);
-            fprintf(f, "splits_y=\"%g\" ", cp->xform[i].splits_y);
-         }
-
-         if (stripes_var==1) {
-            fprintf(f, "stripes_space=\"%g\" ", cp->xform[i].stripes_space);
-            fprintf(f, "stripes_warp=\"%g\" ", cp->xform[i].stripes_warp);
-         }
-
-         if (wedge_var==1) {
-            fprintf(f, "wedge_angle=\"%g\" ", cp->xform[i].wedge_angle);
-            fprintf(f, "wedge_hole=\"%g\" ", cp->xform[i].wedge_hole);
-            fprintf(f, "wedge_count=\"%g\" ", cp->xform[i].wedge_count);
-            fprintf(f, "wedge_swirl=\"%g\" ", cp->xform[i].wedge_swirl);            
-         }
-
-         if (wedgeJ_var==1) {
-            fprintf(f, "wedge_julia_angle=\"%g\" ", cp->xform[i].wedge_julia_angle);
-            fprintf(f, "wedge_julia_count=\"%g\" ", cp->xform[i].wedge_julia_count);
-            fprintf(f, "wedge_julia_power=\"%g\" ", cp->xform[i].wedge_julia_power);
-            fprintf(f, "wedge_julia_dist=\"%g\" ", cp->xform[i].wedge_julia_dist);            
-         }
-
-         if (wedgeS_var==1) {
-            fprintf(f, "wedge_sph_angle=\"%g\" ", cp->xform[i].wedge_sph_angle);
-            fprintf(f, "wedge_sph_hole=\"%g\" ", cp->xform[i].wedge_sph_hole);
-            fprintf(f, "wedge_sph_count=\"%g\" ", cp->xform[i].wedge_sph_count);
-            fprintf(f, "wedge_sph_swirl=\"%g\" ", cp->xform[i].wedge_sph_swirl);            
-         }
-
-         if (whorl_var==1) {
-            fprintf(f, "whorl_inside=\"%g\" ", cp->xform[i].whorl_inside);
-            fprintf(f, "whorl_outside=\"%g\" ", cp->xform[i].whorl_outside);
-         }
-
-         if (waves2_var==1) {
-            fprintf(f, "waves2_scalex=\"%g\" ", cp->xform[i].waves2_scalex);
-            fprintf(f, "waves2_scaley=\"%g\" ", cp->xform[i].waves2_scaley);
-            fprintf(f, "waves2_freqx=\"%g\" ", cp->xform[i].waves2_freqx);
-            fprintf(f, "waves2_freqy=\"%g\" ", cp->xform[i].waves2_freqy);
-         }
-
-         fprintf(f, "coefs=\"");
-         for (j = 0; j < 3; j++) {
-            if (j) fprintf(f, " ");
-            fprintf(f, "%g %g", cp->xform[i].c[j][0], cp->xform[i].c[j][1]);
-         }
-         fprintf(f, "\"");
-
-         if (!id_matrix(cp->xform[i].post)) {
-            fprintf(f, " post=\"");
-            for (j = 0; j < 3; j++) {
-               if (j) fprintf(f, " ");
-               fprintf(f, "%g %g", cp->xform[i].post[j][0], cp->xform[i].post[j][1]);
-            }
-            fprintf(f, "\"");
-         }
-         
-         if (i!=cp->final_xform_index ) {
-         
-            /* Print out the chaos row for this xform */
-            int numcols = cp->num_xforms - (cp->final_xform_index >= 0);
-            while (numcols > 0 && cp->chaos[i][numcols-1]==1.0)
-               numcols--;
-            
-            if (numcols>0) {   
-               fprintf(f, " chaos=\"");
-               for (j=0;j<numcols;j++)
-                  fprintf(f, "%g ",cp->chaos[i][j]);
-               fprintf(f, "\"");
-            }
-            
-            if (cp->xform[i].visibility<1.0)
-               fprintf(f, " visibility=\"%g\"",cp->xform[i].visibility);
-                
-         }
-
-         fprintf(f, "/>\n");
-
-      }
    }
 
    for (i = 0; i < 256; i++) {
@@ -1980,6 +1638,361 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
    fprintf(f, "</flame>\n");
 
 }
+
+void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, double *chaos_row, int motion_flag) {
+
+   int blob_var=0,pdj_var=0,fan2_var=0,rings2_var=0,perspective_var=0;
+   int juliaN_var=0,juliaScope_var=0,radialBlur_var=0,pie_var=0,disc2_var=0;
+   int ngon_var=0,curl_var=0,rectangles_var=0,supershape_var=0;
+   int flower_var=0,conic_var=0,parabola_var=0,bent2_var=0,bipolar_var=0;
+   int cell_var=0,cpow_var=0,curve_var=0,escher_var=0,lazys_var=0;
+   int modulus_var=0,oscope_var=0,popcorn2_var=0,separation_var=0;
+   int split_var=0,splits_var=0,stripes_var=0,wedge_var=0,wedgeJ_var=0;
+   int wedgeS_var=0,whorl_var=0,waves2_var=0;
+   
+   int j;
+
+   if (motion_flag) {
+      fprintf(f, "      <motion motion_freq=\"%d\" ",x->motion_freq);
+      if (x->motion_func == MOTION_SIN)
+         fprintf(f, "motion_func=\"sin\" ");
+      else if (x->motion_func == MOTION_TRIANGLE)
+         fprintf(f, "motion_func=\"triangle\" ");
+      else if (x->motion_func == MOTION_COS)
+         fprintf(f, "motion_func=\"cos\" ");
+   } else {
+      if (final_flag)
+         fprintf(f, "   <finalxform color=\"%g\" ", x->color);
+      else
+         fprintf(f, "   <xform weight=\"%g\" color=\"%g\" ", x->density, x->color);
+   }
+      
+   fprintf(f, "color_speed=\"%g\" ", x->color_speed);
+   
+   if (!final_flag)
+      fprintf(f, "animate=\"%g\" ", x->animate);
+         
+
+   for (j = 0; j < flam3_nvariations; j++) {
+      double v = x->var[j];
+      if (0.0 != v) {
+         fprintf(f, "%s=\"%g\" ", flam3_variation_names[j], v);
+         if (j==VAR_BLOB)
+            blob_var=1;
+         else if (j==VAR_PDJ)
+            pdj_var=1;
+         else if (j==VAR_FAN2)
+            fan2_var=1;
+         else if (j==VAR_RINGS2)
+            rings2_var=1;
+         else if (j==VAR_PERSPECTIVE)
+            perspective_var=1;
+         else if (j==VAR_JULIAN)
+            juliaN_var=1;
+         else if (j==VAR_JULIASCOPE)
+            juliaScope_var=1;
+         else if (j==VAR_RADIAL_BLUR)
+            radialBlur_var=1;
+         else if (j==VAR_PIE)
+            pie_var=1;
+         else if (j==VAR_NGON)
+            ngon_var=1;
+         else if (j==VAR_CURL)
+            curl_var=1;
+         else if (j==VAR_RECTANGLES)
+            rectangles_var=1;
+         else if (j==VAR_DISC2)
+            disc2_var=1;
+         else if (j==VAR_SUPER_SHAPE)
+            supershape_var=1;
+         else if (j==VAR_FLOWER)
+            flower_var=1;
+         else if (j==VAR_CONIC)
+            conic_var=1;
+         else if (j==VAR_PARABOLA)
+            parabola_var=1;
+         else if (j==VAR_BENT2)
+            bent2_var=1;
+         else if (j==VAR_BIPOLAR)
+            bipolar_var=1;
+         else if (j==VAR_CELL)
+            cell_var=1;
+         else if (j==VAR_CPOW)
+            cpow_var=1;
+         else if (j==VAR_CURVE)
+            curve_var=1;
+         else if (j==VAR_ESCHER)
+            escher_var=1;
+         else if (j==VAR_LAZYSUSAN)
+            lazys_var=1;
+         else if (j==VAR_MODULUS)
+            modulus_var=1;
+         else if (j==VAR_OSCILLOSCOPE)
+            oscope_var=1;
+         else if (j==VAR_POPCORN2)
+            popcorn2_var=1;
+         else if (j==VAR_SPLIT)
+            split_var=1;
+         else if (j==VAR_SPLITS)
+            splits_var=1;
+         else if (j==VAR_STRIPES)
+            stripes_var=1;
+         else if (j==VAR_WEDGE)
+            wedge_var=1;
+         else if (j==VAR_WEDGE_JULIA)
+            wedgeJ_var=1;
+         else if (j==VAR_WEDGE_SPH)
+            wedgeS_var=1;
+         else if (j==VAR_WHORL)
+            whorl_var=1;
+         else if (j==VAR_WAVES2)
+            waves2_var=1;
+      }
+   }
+
+   if (blob_var==1) {
+      fprintf(f, "blob_low=\"%g\" ", x->blob_low);
+      fprintf(f, "blob_high=\"%g\" ", x->blob_high);
+      fprintf(f, "blob_waves=\"%g\" ", x->blob_waves);
+   }
+
+   if (pdj_var==1) {
+      fprintf(f, "pdj_a=\"%g\" ", x->pdj_a);
+      fprintf(f, "pdj_b=\"%g\" ", x->pdj_b);
+      fprintf(f, "pdj_c=\"%g\" ", x->pdj_c);
+      fprintf(f, "pdj_d=\"%g\" ", x->pdj_d);
+   }
+
+   if (fan2_var==1) {
+      fprintf(f, "fan2_x=\"%g\" ", x->fan2_x);
+      fprintf(f, "fan2_y=\"%g\" ", x->fan2_y);
+   }
+
+   if (rings2_var==1) {
+      fprintf(f, "rings2_val=\"%g\" ", x->rings2_val);
+   }
+
+   if (perspective_var==1) {
+      fprintf(f, "perspective_angle=\"%g\" ", x->perspective_angle);
+      fprintf(f, "perspective_dist=\"%g\" ", x->perspective_dist);
+   }
+
+   if (juliaN_var==1) {
+      fprintf(f, "julian_power=\"%g\" ", x->juliaN_power);
+      fprintf(f, "julian_dist=\"%g\" ", x->juliaN_dist);
+   }
+
+   if (juliaScope_var==1) {
+      fprintf(f, "juliascope_power=\"%g\" ", x->juliaScope_power);
+      fprintf(f, "juliascope_dist=\"%g\" ", x->juliaScope_dist);
+   }
+
+   if (radialBlur_var==1) {
+      fprintf(f, "radial_blur_angle=\"%g\" ", x->radialBlur_angle);
+   }
+
+   if (pie_var==1) {
+      fprintf(f, "pie_slices=\"%g\" ", x->pie_slices);
+      fprintf(f, "pie_rotation=\"%g\" ", x->pie_rotation);
+      fprintf(f, "pie_thickness=\"%g\" ", x->pie_thickness);
+   }
+
+   if (ngon_var==1) {
+      fprintf(f, "ngon_sides=\"%g\" ", x->ngon_sides);
+      fprintf(f, "ngon_power=\"%g\" ", x->ngon_power);
+      fprintf(f, "ngon_corners=\"%g\" ", x->ngon_corners);
+      fprintf(f, "ngon_circle=\"%g\" ", x->ngon_circle);
+   }
+
+   if (curl_var==1) {
+      fprintf(f, "curl_c1=\"%g\" ", x->curl_c1);
+      fprintf(f, "curl_c2=\"%g\" ", x->curl_c2);
+   }
+
+   if (rectangles_var==1) {
+      fprintf(f, "rectangles_x=\"%g\" ", x->rectangles_x);
+      fprintf(f, "rectangles_y=\"%g\" ", x->rectangles_y);
+   }
+
+   if (disc2_var==1) {
+      fprintf(f, "disc2_rot=\"%g\" ", x->disc2_rot);
+      fprintf(f, "disc2_twist=\"%g\" ", x->disc2_twist);
+   }
+
+   if (supershape_var==1) {
+      fprintf(f, "super_shape_rnd=\"%g\" ", x->supershape_rnd);
+      fprintf(f, "super_shape_m=\"%g\" ", x->supershape_m);
+      fprintf(f, "super_shape_n1=\"%g\" ", x->supershape_n1);
+      fprintf(f, "super_shape_n2=\"%g\" ", x->supershape_n2);
+      fprintf(f, "super_shape_n3=\"%g\" ", x->supershape_n3);
+      fprintf(f, "super_shape_holes=\"%g\" ", x->supershape_holes);
+   }
+
+   if (flower_var==1) {
+      fprintf(f, "flower_petals=\"%g\" ", x->flower_petals);
+      fprintf(f, "flower_holes=\"%g\" ", x->flower_holes);
+   }
+
+   if (conic_var==1) {
+      fprintf(f, "conic_eccentricity=\"%g\" ", x->conic_eccen);
+      fprintf(f, "conic_holes=\"%g\" ", x->conic_holes);
+   }
+
+   if (parabola_var==1) {
+      fprintf(f, "parabola_height=\"%g\" ", x->parabola_height);
+      fprintf(f, "parabola_width=\"%g\" ", x->parabola_width);
+   }
+   
+   if (bent2_var==1) {
+      fprintf(f, "bent2_x=\"%g\" ", x->bent2_x);
+      fprintf(f, "bent2_y=\"%g\" ", x->bent2_y);
+   }
+   
+   if (bipolar_var==1) {
+      fprintf(f, "bipolar_shift=\"%g\" ", x->bipolar_shift);
+   }
+
+   if (cell_var==1) {
+      fprintf(f, "cell_size=\"%g\" ", x->cell_size);
+   }
+
+   if (cpow_var==1) {
+      fprintf(f, "cpow_i=\"%g\" ", x->cpow_i);
+      fprintf(f, "cpow_r=\"%g\" ", x->cpow_r);
+      fprintf(f, "cpow_power=\"%g\" ", x->cpow_power);
+   }
+
+   if (curve_var==1) {
+      fprintf(f, "curve_xamp=\"%g\" ", x->curve_xamp);
+      fprintf(f, "curve_yamp=\"%g\" ", x->curve_yamp);
+      fprintf(f, "curve_xlength=\"%g\" ", x->curve_xlength);
+      fprintf(f, "curve_ylength=\"%g\" ", x->curve_ylength);
+   }
+
+   if (escher_var==1) {
+      fprintf(f, "escher_beta=\"%g\" ", x->escher_beta);
+   }
+
+   if (lazys_var==1) {
+      fprintf(f, "lazysusan_x=\"%g\" ", x->lazysusan_x);
+      fprintf(f, "lazysusan_y=\"%g\" ", x->lazysusan_y);
+      fprintf(f, "lazysusan_spin=\"%g\" ", x->lazysusan_spin);
+      fprintf(f, "lazysusan_space=\"%g\" ", x->lazysusan_space);
+      fprintf(f, "lazysusan_twist=\"%g\" ", x->lazysusan_twist);
+   }
+
+   if (modulus_var==1) {
+      fprintf(f, "modulus_x=\"%g\" ", x->modulus_x);
+      fprintf(f, "modulus_y=\"%g\" ", x->modulus_y);
+   }
+
+   if (oscope_var==1) {
+      fprintf(f, "oscope_separation=\"%g\" ", x->oscope_separation);
+      fprintf(f, "oscope_frequency=\"%g\" ", x->oscope_frequency);
+      fprintf(f, "oscope_amplitude=\"%g\" ", x->oscope_amplitude);
+      fprintf(f, "oscope_damping=\"%g\" ", x->oscope_damping);
+   }
+
+   if (popcorn2_var==1) {
+      fprintf(f, "popcorn2_x=\"%g\" ", x->popcorn2_x);
+      fprintf(f, "popcorn2_y=\"%g\" ", x->popcorn2_y);
+      fprintf(f, "popcorn2_c=\"%g\" ", x->popcorn2_c);
+   }
+
+   if (separation_var==1) {
+      fprintf(f, "separation_x=\"%g\" ", x->separation_x);
+      fprintf(f, "separation_y=\"%g\" ", x->separation_y);
+      fprintf(f, "separation_xinside=\"%g\" ", x->separation_xinside);
+      fprintf(f, "separation_yinside=\"%g\" ", x->separation_yinside);
+   }
+
+   if (split_var==1) {
+      fprintf(f, "split_xsize=\"%g\" ", x->split_xsize);
+      fprintf(f, "split_ysize=\"%g\" ", x->split_ysize);
+   }
+
+   if (splits_var==1) {
+      fprintf(f, "splits_x=\"%g\" ", x->splits_x);
+      fprintf(f, "splits_y=\"%g\" ", x->splits_y);
+   }
+
+   if (stripes_var==1) {
+      fprintf(f, "stripes_space=\"%g\" ", x->stripes_space);
+      fprintf(f, "stripes_warp=\"%g\" ", x->stripes_warp);
+   }
+
+   if (wedge_var==1) {
+      fprintf(f, "wedge_angle=\"%g\" ", x->wedge_angle);
+      fprintf(f, "wedge_hole=\"%g\" ", x->wedge_hole);
+      fprintf(f, "wedge_count=\"%g\" ", x->wedge_count);
+      fprintf(f, "wedge_swirl=\"%g\" ", x->wedge_swirl);            
+   }
+
+   if (wedgeJ_var==1) {
+      fprintf(f, "wedge_julia_angle=\"%g\" ", x->wedge_julia_angle);
+      fprintf(f, "wedge_julia_count=\"%g\" ", x->wedge_julia_count);
+      fprintf(f, "wedge_julia_power=\"%g\" ", x->wedge_julia_power);
+      fprintf(f, "wedge_julia_dist=\"%g\" ", x->wedge_julia_dist);            
+   }
+
+   if (wedgeS_var==1) {
+      fprintf(f, "wedge_sph_angle=\"%g\" ", x->wedge_sph_angle);
+      fprintf(f, "wedge_sph_hole=\"%g\" ", x->wedge_sph_hole);
+      fprintf(f, "wedge_sph_count=\"%g\" ", x->wedge_sph_count);
+      fprintf(f, "wedge_sph_swirl=\"%g\" ", x->wedge_sph_swirl);            
+   }
+
+   if (whorl_var==1) {
+      fprintf(f, "whorl_inside=\"%g\" ", x->whorl_inside);
+      fprintf(f, "whorl_outside=\"%g\" ", x->whorl_outside);
+   }
+
+   if (waves2_var==1) {
+      fprintf(f, "waves2_scalex=\"%g\" ", x->waves2_scalex);
+      fprintf(f, "waves2_scaley=\"%g\" ", x->waves2_scaley);
+      fprintf(f, "waves2_freqx=\"%g\" ", x->waves2_freqx);
+      fprintf(f, "waves2_freqy=\"%g\" ", x->waves2_freqy);
+   }
+
+   fprintf(f, "coefs=\"");
+   for (j = 0; j < 3; j++) {
+      if (j) fprintf(f, " ");
+      fprintf(f, "%g %g", x->c[j][0], x->c[j][1]);
+   }
+   fprintf(f, "\"");
+
+   if (!id_matrix(x->post)) {
+      fprintf(f, " post=\"");
+      for (j = 0; j < 3; j++) {
+         if (j) fprintf(f, " ");
+         fprintf(f, "%g %g", x->post[j][0], x->post[j][1]);
+      }
+      fprintf(f, "\"");
+   }
+      
+   if (!final_flag) {
+      
+      /* Print out the chaos row for this xform */
+      int numcols = numstd;
+
+      while (numcols > 0 && chaos_row[numcols-1]==1.0)
+         numcols--;
+         
+      if (numcols>0) {   
+         fprintf(f, " chaos=\"");
+         for (j=0;j<numcols;j++)
+            fprintf(f, "%g ",chaos_row[j]);
+         fprintf(f, "\"");
+      }
+      
+      if (x->visibility<1.0)
+         fprintf(f, " visibility=\"%g\"",x->visibility);
+               
+   }
+
+   fprintf(f, "/>\n");
+}
+
 
 /* returns a uniform variable from 0 to 1 */
 double flam3_random01() {
@@ -2671,9 +2684,6 @@ void flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
    bmax[1] = points[4 * high_target + 1];
    free(points);
 }
-
-
-
 
 
 typedef double bucket_double[5];
