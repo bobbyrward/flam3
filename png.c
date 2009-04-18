@@ -21,7 +21,6 @@
 #include <stdlib.h>
 #include <png.h>
 #include <setjmp.h>
-#include <arpa/inet.h>
 
 #include "config.h"
 #include "img.h"
@@ -30,6 +29,8 @@
 
 #ifdef WIN32
 #include <winsock.h> /* for htons */
+#else
+#include <arpa/inet.h>
 #endif
 
 void write_png(FILE *file, void *image, int width, int height, flam3_img_comments *fpc, int bpc) {

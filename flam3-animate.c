@@ -60,7 +60,9 @@ int main(int argc, char **argv) {
    
   char *slashloc;
   char exepath[256];
-  char palpath[256];  
+  char palpath[256];
+  memset(exepath,0,256);
+  memset(palpath,0,256);  
    slashloc = strrchr(argv[0],'\\');
 	if (NULL==slashloc) {
 	   sprintf(palpath,"flam3_palettes=flam3-palettes.xml");
