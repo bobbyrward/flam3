@@ -725,11 +725,11 @@ void var32_juliaN_generic (void *helper, double weight) {
    /* juliaN (03/06) */
    flam3_iter_helper *f = (flam3_iter_helper *)helper;
 
-   int t_rnd = trunc((f->xform->juliaN_rN)*flam3_random_isaac_01(f->rc));
+   int t_rnd = trunc((f->xform->julian_rN)*flam3_random_isaac_01(f->rc));
    
-   double tmpr = (f->precalc_atanyx + 2 * M_PI * t_rnd) / f->xform->juliaN_power;
+   double tmpr = (f->precalc_atanyx + 2 * M_PI * t_rnd) / f->xform->julian_power;
 
-   double r = weight * pow(f->precalc_sumsq, f->xform->juliaN_cn);
+   double r = weight * pow(f->precalc_sumsq, f->xform->julian_cn);
    double sina, cosa;
    sincos(tmpr,&sina,&cosa);
 
@@ -741,19 +741,19 @@ void var33_juliaScope_generic (void *helper, double weight) {
    /* juliaScope (03/06) */
    flam3_iter_helper *f = (flam3_iter_helper *)helper;
 
-   int t_rnd = trunc((f->xform->juliaScope_rN) * flam3_random_isaac_01(f->rc));
+   int t_rnd = trunc((f->xform->juliascope_rN) * flam3_random_isaac_01(f->rc));
 
    double tmpr, r;
    double sina, cosa;
 
    if ((t_rnd & 1) == 0)
-      tmpr = (2 * M_PI * t_rnd + f->precalc_atanyx) / f->xform->juliaScope_power;
+      tmpr = (2 * M_PI * t_rnd + f->precalc_atanyx) / f->xform->juliascope_power;
    else
-      tmpr = (2 * M_PI * t_rnd - f->precalc_atanyx) / f->xform->juliaScope_power;
+      tmpr = (2 * M_PI * t_rnd - f->precalc_atanyx) / f->xform->juliascope_power;
 
    sincos(tmpr,&sina,&cosa);
 
-   r = weight * pow(f->precalc_sumsq, f->xform->juliaScope_cn);
+   r = weight * pow(f->precalc_sumsq, f->xform->juliascope_cn);
 
    f->p0 += r * cosa;
    f->p1 += r * sina;
@@ -1136,20 +1136,20 @@ void var50_supershape(void *helper, double weight) {
    double st,ct;
    double myrnd;
 
-   theta = f->xform->supershape_pm_4 * f->precalc_atanyx + M_PI_4;
+   theta = f->xform->super_shape_pm_4 * f->precalc_atanyx + M_PI_4;
    
    sincos(theta,&st,&ct);
 
    t1 = fabs(ct);
-   t1 = pow(t1,f->xform->supershape_n2);
+   t1 = pow(t1,f->xform->super_shape_n2);
 
    t2 = fabs(st);
-   t2 = pow(t2,f->xform->supershape_n3);
+   t2 = pow(t2,f->xform->super_shape_n3);
    
-   myrnd = f->xform->supershape_rnd;
+   myrnd = f->xform->super_shape_rnd;
 
-   r = weight * ( (myrnd*flam3_random_isaac_01(f->rc) + (1.0-myrnd)*f->precalc_sqrt) - f->xform->supershape_holes) 
-      * pow(t1+t2,f->xform->supershape_pneg1_n1) / f->precalc_sqrt;
+   r = weight * ( (myrnd*flam3_random_isaac_01(f->rc) + (1.0-myrnd)*f->precalc_sqrt) - f->xform->super_shape_holes) 
+      * pow(t1+t2,f->xform->super_shape_pneg1_n1) / f->precalc_sqrt;
 
    f->p0 += r * f->tx;
    f->p1 += r * f->ty;
@@ -1181,7 +1181,7 @@ void var52_conic(void *helper, double weight) {
     flam3_iter_helper *f = (flam3_iter_helper *)helper;
     double ct = f->tx / f->precalc_sqrt;
     double r = weight * (flam3_random_isaac_01(f->rc) - f->xform->conic_holes) * 
-                    f->xform->conic_eccen / (1 + f->xform->conic_eccen*ct) / f->precalc_sqrt;
+                    f->xform->conic_eccentricity / (1 + f->xform->conic_eccentricity*ct) / f->precalc_sqrt;
 
     f->p0 += r * f->tx;
     f->p1 += r * f->ty;
@@ -1824,8 +1824,8 @@ void perspective_precalc(flam3_xform *xf) {
 }
 
 void juliaN_precalc(flam3_xform *xf) {
-   xf->juliaN_rN = fabs(xf->juliaN_power);
-   xf->juliaN_cn = xf->juliaN_dist / (double)xf->juliaN_power / 2.0;
+   xf->julian_rN = fabs(xf->julian_power);
+   xf->julian_cn = xf->julian_dist / (double)xf->julian_power / 2.0;
 }
 
 void wedgeJulia_precalc(flam3_xform *xf) {
@@ -1835,12 +1835,12 @@ void wedgeJulia_precalc(flam3_xform *xf) {
 }
 
 void juliaScope_precalc(flam3_xform *xf) {
-   xf->juliaScope_rN = fabs(xf->juliaScope_power);
-   xf->juliaScope_cn = xf->juliaScope_dist / (double)xf->juliaScope_power / 2.0;
+   xf->juliascope_rN = fabs(xf->juliascope_power);
+   xf->juliascope_cn = xf->juliascope_dist / (double)xf->juliascope_power / 2.0;
 }
 
 void radial_blur_precalc(flam3_xform *xf) {
-   sincos(xf->radialBlur_angle * M_PI / 2.0,
+   sincos(xf->radial_blur_angle * M_PI / 2.0,
              &xf->radialBlur_spinvar, &xf->radialBlur_zoomvar);
 }
 
@@ -1875,8 +1875,8 @@ void disc2_precalc(flam3_xform *xf) {
 }
 
 void supershape_precalc(flam3_xform *xf) {
-   xf->supershape_pm_4 = xf->supershape_m / 4.0;
-   xf->supershape_pneg1_n1 = -1.0 / xf->supershape_n1;
+   xf->super_shape_pm_4 = xf->super_shape_m / 4.0;
+   xf->super_shape_pneg1_n1 = -1.0 / xf->super_shape_n1;
 }
 
 void xform_precalc(flam3_genome *cp, int xi) {
@@ -2284,7 +2284,7 @@ void initialize_xforms(flam3_genome *thiscp, int start_here) {
       thiscp->xform[i].perspective_dist = 0.0;
       thiscp->xform[i].persp_vsin = 0.0;
       thiscp->xform[i].persp_vfcos = 0.0;
-      thiscp->xform[i].radialBlur_angle = 0.0;
+      thiscp->xform[i].radial_blur_angle = 0.0;
       thiscp->xform[i].disc2_rot = 0.0;
       thiscp->xform[i].disc2_twist = 0.0;
       thiscp->xform[i].disc2_sinadd = 0.0;
@@ -2354,14 +2354,14 @@ void initialize_xforms(flam3_genome *thiscp, int start_here) {
       thiscp->xform[i].waves2_freqx = 0.0;       
       thiscp->xform[i].waves2_freqy = 0.0;       
        
-      thiscp->xform[i].juliaN_power = 1.0;
-      thiscp->xform[i].juliaN_dist = 1.0;
-      thiscp->xform[i].juliaN_rN = 1.0;
-      thiscp->xform[i].juliaN_cn = 0.5;
-      thiscp->xform[i].juliaScope_power = 1.0;
-      thiscp->xform[i].juliaScope_dist = 1.0;
-      thiscp->xform[i].juliaScope_rN = 1.0;
-      thiscp->xform[i].juliaScope_cn = 0.5;
+      thiscp->xform[i].julian_power = 1.0;
+      thiscp->xform[i].julian_dist = 1.0;
+      thiscp->xform[i].julian_rN = 1.0;
+      thiscp->xform[i].julian_cn = 0.5;
+      thiscp->xform[i].juliascope_power = 1.0;
+      thiscp->xform[i].juliascope_dist = 1.0;
+      thiscp->xform[i].juliascope_rN = 1.0;
+      thiscp->xform[i].juliascope_cn = 0.5;
       thiscp->xform[i].radialBlur_spinvar = 0.0;
       thiscp->xform[i].radialBlur_zoomvar = 1.0;
       thiscp->xform[i].pie_slices = 6.0;
@@ -2376,13 +2376,13 @@ void initialize_xforms(flam3_genome *thiscp, int start_here) {
       thiscp->xform[i].rectangles_x = 1.0;
       thiscp->xform[i].rectangles_y = 1.0;
       thiscp->xform[i].amw_amp = 1.0;
-      thiscp->xform[i].supershape_rnd = 0.0;
-      thiscp->xform[i].supershape_m = 0.0;
-      thiscp->xform[i].supershape_n1 = 1.0;
-      thiscp->xform[i].supershape_n2 = 1.0;
-      thiscp->xform[i].supershape_n3 = 1.0;
-      thiscp->xform[i].supershape_holes = 0.0;
-      thiscp->xform[i].conic_eccen = 1.0;
+      thiscp->xform[i].super_shape_rnd = 0.0;
+      thiscp->xform[i].super_shape_m = 0.0;
+      thiscp->xform[i].super_shape_n1 = 1.0;
+      thiscp->xform[i].super_shape_n2 = 1.0;
+      thiscp->xform[i].super_shape_n3 = 1.0;
+      thiscp->xform[i].super_shape_holes = 0.0;
+      thiscp->xform[i].conic_eccentricity = 1.0;
       thiscp->xform[i].conic_holes = 0.0;
    }
 }

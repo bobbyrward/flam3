@@ -229,15 +229,15 @@ typedef struct xform {
    double perspective_dist;
 
    /* Julia_N */
-   double juliaN_power;
-   double juliaN_dist;
+   double julian_power;
+   double julian_dist;
 
    /* Julia_Scope */
-   double juliaScope_power;
-   double juliaScope_dist;
+   double juliascope_power;
+   double juliascope_dist;
 
    /* Radial_Blur */
-   double radialBlur_angle;
+   double radial_blur_angle;
 
    /* Pie */
    double pie_slices;
@@ -266,19 +266,19 @@ typedef struct xform {
    double disc2_twist;
 
    /* Supershape */
-   double supershape_rnd;
-   double supershape_m;
-   double supershape_n1;
-   double supershape_n2;
-   double supershape_n3;
-   double supershape_holes;
+   double super_shape_rnd;
+   double super_shape_m;
+   double super_shape_n1;
+   double super_shape_n2;
+   double super_shape_n3;
+   double super_shape_holes;
    
    /* Flower */
    double flower_petals;
    double flower_holes;
    
    /* Conic */
-   double conic_eccen;
+   double conic_eccentricity;
    double conic_holes;
    
    /* Parabola */
@@ -367,12 +367,12 @@ typedef struct xform {
    double persp_vfcos;
 
    /* If Julia_N is used, precalculate these values */
-   double juliaN_rN;
-   double juliaN_cn;
+   double julian_rN;
+   double julian_cn;
 
    /* If Julia_Scope is used, precalculate these values */
-   double juliaScope_rN;
-   double juliaScope_cn;
+   double juliascope_rN;
+   double juliascope_cn;
    
    /* if Wedge_Julia, precalculate */
    double wedgeJulia_rN;
@@ -393,8 +393,8 @@ typedef struct xform {
    double disc2_timespi;
 
    /* If supershape is used, precalculate these values */
-   double supershape_pm_4;
-   double supershape_pneg1_n1;
+   double super_shape_pm_4;
+   double super_shape_pneg1_n1;
 
    int num_active_vars;
    double active_var_weights[flam3_nvariations];
@@ -500,6 +500,7 @@ void flam3_copy_xform(flam3_xform *dest, flam3_xform *src);
 void flam3_copy(flam3_genome *dest, flam3_genome *src);
 void flam3_copyx(flam3_genome *dest, flam3_genome *src, int num_std, int num_final);
 void flam3_copy_params(flam3_xform *dest, flam3_xform *src, int varn);
+void flam3_delete_motion_elements(flam3_xform *xf);
 
 void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc);
 unsigned short* flam3_create_xform_distrib(flam3_genome *cp);
@@ -561,6 +562,7 @@ typedef struct {
    int            verbose;
    int            bits;
    int            bytes_per_channel;
+   int            earlyclip;
    double         time;
    int            (*progress)(void *, double, int, double);
    void          *progress_parameter;

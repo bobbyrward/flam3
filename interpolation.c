@@ -67,6 +67,16 @@ int id_matrix(double s[3][2]) {
       (s[2][1] == 0.0);
 }
 
+int zero_matrix(double s[3][2]) {
+   return
+      (s[0][0] == 0.0) &&
+      (s[0][1] == 0.0) &&
+      (s[1][0] == 0.0) &&
+      (s[1][1] == 0.0) &&
+      (s[2][0] == 0.0) &&
+      (s[2][1] == 0.0);
+}
+
 void copy_matrix(double to[3][2], double from[3][2]) {
 
    to[0][0] = from[0][0];
@@ -431,11 +441,11 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
       INTERP(xform[i].rings2_val);
       INTERP(xform[i].perspective_angle);
       INTERP(xform[i].perspective_dist);
-      INTERP(xform[i].juliaN_power);
-      INTERP(xform[i].juliaN_dist);
-      INTERP(xform[i].juliaScope_power);
-      INTERP(xform[i].juliaScope_dist);
-      INTERP(xform[i].radialBlur_angle);
+      INTERP(xform[i].julian_power);
+      INTERP(xform[i].julian_dist);
+      INTERP(xform[i].juliascope_power);
+      INTERP(xform[i].juliascope_dist);
+      INTERP(xform[i].radial_blur_angle);
       INTERP(xform[i].pie_slices);
       INTERP(xform[i].pie_rotation);
       INTERP(xform[i].pie_thickness);
@@ -450,15 +460,15 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
       INTERP(xform[i].amw_amp);
       INTERP(xform[i].disc2_rot);
       INTERP(xform[i].disc2_twist);
-      INTERP(xform[i].supershape_rnd);
-      INTERP(xform[i].supershape_m);
-      INTERP(xform[i].supershape_n1);
-      INTERP(xform[i].supershape_n2);
-      INTERP(xform[i].supershape_n3);
-      INTERP(xform[i].supershape_holes);
+      INTERP(xform[i].super_shape_rnd);
+      INTERP(xform[i].super_shape_m);
+      INTERP(xform[i].super_shape_n1);
+      INTERP(xform[i].super_shape_n2);
+      INTERP(xform[i].super_shape_n3);
+      INTERP(xform[i].super_shape_holes);
       INTERP(xform[i].flower_petals);
       INTERP(xform[i].flower_holes);
-      INTERP(xform[i].conic_eccen);
+      INTERP(xform[i].conic_eccentricity);
       INTERP(xform[i].conic_holes);
       INTERP(xform[i].parabola_height);
       INTERP(xform[i].parabola_width);
@@ -631,6 +641,9 @@ void flam3_align(flam3_genome *dst, flam3_genome *src, int nsrc) {
    int xf,j;
    int ii,fnd;
    double normed;
+   int usethisone;
+   
+   usethisone = (nsrc/2) - 1;
    
    max_nx = src[0].num_xforms - (src[0].final_xform_index >= 0);
    max_fx = src[0].final_xform_enable;
@@ -653,25 +666,27 @@ void flam3_align(flam3_genome *dst, flam3_genome *src, int nsrc) {
    for (i = 0; i < nsrc; i++) {
       flam3_copyx(&dst[i], &src[i], max_nx, max_fx);
    }
+
+   /* Skip if this genome is compatibility mode */
+   if (dst[usethisone].interpolation_type == flam3_inttype_compat ||
+         dst[usethisone].interpolation_type == flam3_inttype_older)
+      return;
+
       
    /* Check to see if there's a parametric variation present in one xform   */
    /* but not in an aligned xform.  If this is the case, use the parameters */
    /* from the xform with the variation as the defaults for the blank one.  */
-
-   /* Skip if this genome is compatibility mode */
-   if (dst[i].interpolation_type == flam3_inttype_compat ||
-       dst[i].interpolation_type == flam3_inttype_older)
-      return;
    
    /* All genomes will have the same number of xforms at this point */
    /* num = max_nx + max_fx */
    for (i = 0; i<nsrc; i++) {
 
-       for (xf = 0; xf<max_nx+max_fx; xf++) {
+
+      for (xf = 0; xf<max_nx+max_fx; xf++) {
                   
-          /* Loop over the variations to see which of them are set to 0 */
-          /* Note that there are no parametric variations < 23 */
-          for (j = 23; j < flam3_nvariations; j++) {
+         /* Loop over the variations to see which of them are set to 0 */
+         /* Note that there are no parametric variations < 23 */
+         for (j = 23; j < flam3_nvariations; j++) {
          
               if (dst[i].xform[xf].var[j]==0) {
             
@@ -815,11 +830,11 @@ void flam3_align(flam3_genome *dst, flam3_genome *src, int nsrc) {
                    if (dst[i+ii].xform[xf].var[VAR_SUPER_SHAPE]>0) {
                       dst[i].xform[xf].var[VAR_SUPER_SHAPE] = 1.0;
                       /* Keep supershape_m the same */
-                      dst[i].xform[xf].supershape_n1 = 2.0;
-                      dst[i].xform[xf].supershape_n2 = 2.0;
-                      dst[i].xform[xf].supershape_n3 = 2.0;
-                      dst[i].xform[xf].supershape_rnd = 0.0;
-                      dst[i].xform[xf].supershape_holes = 0.0;
+                      dst[i].xform[xf].super_shape_n1 = 2.0;
+                      dst[i].xform[xf].super_shape_n2 = 2.0;
+                      dst[i].xform[xf].super_shape_n3 = 2.0;
+                      dst[i].xform[xf].super_shape_rnd = 0.0;
+                      dst[i].xform[xf].super_shape_holes = 0.0;
                       fnd++;
                    }
                 }

@@ -948,8 +948,6 @@ static void render_rectangle(flam3_frame *spec, void *out,
       double linrange = cp.gam_lin_thresh;
       double funcval = pow(linrange,g);
       double frac;
-      
-      int eclip = argi("earlyclip",0);
 
       vibrancy /= vib_gam_n;
       background[0] /= vib_gam_n/256.0;
@@ -959,7 +957,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
       /* If we're in the early clip mode, perform this first step to  */
       /* apply the gamma correction and clipping before the spat filt */
       
-      if (eclip) {
+      if (spec->earlyclip) {
 
          for (j = 0; j < fic.height; j++) {
             for (i = 0; i < fic.width; i++) {
@@ -1040,7 +1038,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
             p16 = (unsigned short *)p;
             
             /* The old way, spatial filter first and then clip after gamma */
-            if (!eclip) {
+            if (!spec->earlyclip) {
             
                tmp=t[3]/PREFILTER_WHITE;
                

@@ -33,6 +33,7 @@ double motion_funcs(int funcnum, double timeval);
 
 double det_matrix(double s[2][2]);
 int id_matrix(double s[3][2]);
+int zero_matrix(double s[3][2]);
 void copy_matrix(double to[3][2], double from[3][2]);
 void clear_matrix(double m[3][2]);
 void sum_matrix(double s, double m1[3][2], double m2[3][2]);

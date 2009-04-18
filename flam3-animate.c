@@ -39,6 +39,7 @@ int main(int argc, char **argv) {
   int bits = argi("bits", 33);
   int bpc = argi("bpc",8);
   int seed = argi("seed", 0);
+  int earlyclip = argi("earlyclip",0);
   int ftime, channels;
   unsigned char *image;
   flam3_genome *cps,center_cp;
@@ -200,6 +201,7 @@ int main(int argc, char **argv) {
   f.verbose = verbose;
   f.bits = bits;
   f.progress = 0;
+  f.earlyclip = earlyclip;
   f.nthreads = num_threads;
 
   if (16==bpc)

@@ -127,6 +127,7 @@ int main(int argc, char **argv) {
    double pixel_aspect = argf("pixel_aspect", 1.0);
    int name_enable = argi("name_enable",0);
    int num_threads = argi("nthreads",0);
+   int earlyclip = argi("earlyclip",0);
    FILE *in;
    double zoom_scale;
    unsigned int channels;
@@ -253,8 +254,9 @@ int main(int argc, char **argv) {
       f.bits = bits;
       f.time = 0.0;
       f.pixel_aspect_ratio = pixel_aspect;
-      f.progress = 0;
+      f.progress = 0;//print_progress;
       f.nthreads = num_threads;
+      f.earlyclip = earlyclip;
       
       if (16==bpc)
          f.bytes_per_channel = 2;

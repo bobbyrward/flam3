@@ -903,15 +903,15 @@ int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_xaos,
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"perspective_dist")) {
          this_xform->perspective_dist = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"julian_power")) {
-         this_xform->juliaN_power = flam3_atof(att_str);
+         this_xform->julian_power = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"julian_dist")) {
-         this_xform->juliaN_dist = flam3_atof(att_str);
+         this_xform->julian_dist = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"juliascope_power")) {
-         this_xform->juliaScope_power = flam3_atof(att_str);
+         this_xform->juliascope_power = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"juliascope_dist")) {
-         this_xform->juliaScope_dist = flam3_atof(att_str);
+         this_xform->juliascope_dist = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"radial_blur_angle")) {
-         this_xform->radialBlur_angle = flam3_atof(att_str);
+         this_xform->radial_blur_angle = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pie_slices")) {
          this_xform->pie_slices = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"pie_rotation")) {
@@ -941,28 +941,28 @@ int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_xaos,
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"disc2_twist")) {
          this_xform->disc2_twist = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_rnd")) {
-         this_xform->supershape_rnd = flam3_atof(att_str);
+         this_xform->super_shape_rnd = flam3_atof(att_str);
          /* Limit to [0,1] */
-         if (this_xform->supershape_rnd<0)
-            this_xform->supershape_rnd=0;
-         else if (this_xform->supershape_rnd>1)
-            this_xform->supershape_rnd=1;
+         if (this_xform->super_shape_rnd<0)
+            this_xform->super_shape_rnd=0;
+         else if (this_xform->super_shape_rnd>1)
+            this_xform->super_shape_rnd=1;
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_m")) {
-         this_xform->supershape_m = flam3_atof(att_str);
+         this_xform->super_shape_m = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_n1")) {
-         this_xform->supershape_n1 = flam3_atof(att_str);
+         this_xform->super_shape_n1 = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_n2")) {
-         this_xform->supershape_n2 = flam3_atof(att_str);
+         this_xform->super_shape_n2 = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_n3")) {
-         this_xform->supershape_n3 = flam3_atof(att_str);
+         this_xform->super_shape_n3 = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"super_shape_holes")) {
-         this_xform->supershape_holes = flam3_atof(att_str);
+         this_xform->super_shape_holes = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"flower_petals")) {
          this_xform->flower_petals = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"flower_holes")) {
          this_xform->flower_holes = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"conic_eccentricity")) {
-         this_xform->conic_eccen = flam3_atof(att_str);
+         this_xform->conic_eccentricity = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"conic_holes")) {
          this_xform->conic_holes = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"parabola_height")) {

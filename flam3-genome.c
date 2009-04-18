@@ -267,7 +267,7 @@ void spin(int frame, double blend, flam3_genome *parent, flam3_genome *templ)
 
    /* Force linear interpolation - unsure if this is still necessary     */
    /* I believe we put this in so that older clients could render frames */
-   result->interpolation_type = flam3_inttype_linear;
+//   result->interpolation_type = flam3_inttype_linear;
 
    /* Create the edit doc xml */
    sprintf(action,"rotate %g",blend*360.0);
@@ -320,14 +320,14 @@ void spin_inter(int frame, double blend, int seqflag, flam3_genome *parents, fla
 
    /* Set genome attributes */
    result->time = (double)frame;
-   result->interpolation_type = flam3_inttype_linear;
+//   result->interpolation_type = flam3_inttype_linear;
 
    /* Create the edit doc xml */
    sprintf(action,"interpolate %g",blend*360.0);
    doc = create_new_editdoc(action, &parents[0], &parents[1]);
    result->edits = doc;
 
-   /* Subpixel jitter *
+   /* Subpixel jitter */
    offset(result);
 
    /* Make the name of the flame the time */
@@ -428,6 +428,7 @@ double try_colors(flam3_genome *g, int color_resolution) {
     f.verbose = 0;
     f.genomes = g;
     f.ngenomes = 1;
+    f.earlyclip = 1;
     f.pixel_aspect_ratio = 1.0;
     f.progress = 0;
     f.nthreads = 1;
@@ -637,6 +638,7 @@ main(argc, argv)
    //f.temporal_filter_radius = 0.0;
    f.bits = bits;
    f.bytes_per_channel = 1;
+   f.earlyclip = 1;
    f.verbose = 0;
    f.genomes = &cp_orig;
    f.ngenomes = 1;
@@ -776,7 +778,7 @@ main(argc, argv)
    if (cross1) parent1 = string_to_cp(cross1, &parent1_n);
    if (strip) parent0 = string_to_cp(strip, &parent0_n);
 
-   if (clone_all) { /* Keeps motion intact */
+   if (clone_all) {
       flam3_genome *cp;
       FILE *fp;
 
@@ -798,7 +800,7 @@ main(argc, argv)
       exit(0);
    }
    
-   if (animate) { /* Ignore motion */
+   if (animate) {
       flam3_genome *cps;
       flam3_genome interpolated;
       int first_frame,last_frame;
@@ -820,6 +822,11 @@ main(argc, argv)
             cps[i].time, cps[i-1].time, i);
             exit(1);
          }
+         /* Strip out all motion elements here */
+         for (j=0;j<cps[i].num_xforms;j++)
+            flam3_delete_motion_elements(&cps[i].xform[j]);
+            
+         
       }
 
       if (!getenv("time") && !getenv("frame")) {
@@ -861,7 +868,7 @@ main(argc, argv)
    }
 
 
-   if (sequence) { /* Motion is applied in spin/spin_inter, do not print */
+   if (sequence) {
       flam3_genome *cp;
       double blend, spread;
       int seqflag;
@@ -879,6 +886,7 @@ main(argc, argv)
          exit(1);
       }
       cp = flam3_parse_from_file(fp, sequence, flam3_defaults_on, &ncp);
+      fclose(fp);
       if (NULL == cp) exit(1);
       if (enclosed) printf("<sequence version=\"FLAM3-%s\">\n", flam3_version());
       spread = 1.0/nframes;
@@ -928,7 +936,7 @@ main(argc, argv)
       exit(0);
    }
 
-   if (inter || rotate) { /* Motion applied in result, do not print */
+   if (inter || rotate) {
       flam3_genome *cp;
       double blend, spread;
       char *fname = inter?inter:rotate;
@@ -980,7 +988,7 @@ main(argc, argv)
       exit(0);
    }
 
-   if (strip) { /* Do not print motion */
+   if (strip) {
       flam3_genome *cp;
       FILE *fp;
 
@@ -1002,6 +1010,11 @@ main(argc, argv)
 
       for (i = 0; i < ncp; i++) {
          double old_center[2];
+
+         /* Strip out motion elements */         
+         for (j=0;j<cp[i].num_xforms;j++)
+            flam3_delete_motion_elements(&cp[i].xform[j]);
+         
          old_center[0] = cp[i].center[0];
          old_center[1] = cp[i].center[1];
          cp[i].height /= nframes;
@@ -1037,7 +1050,7 @@ main(argc, argv)
 
       count = 0;
 
-      if (clone) { /* Keep motion intact, print it */
+      if (clone) {
 
          /* Action is 'clone' with trunc_vars concat */
          sprintf(action,"clone");
@@ -1099,7 +1112,6 @@ main(argc, argv)
                   } while (!done);
                } else if (r < 0.3) {
                   // change one xform coefs but not the vars
-                  /* Retains motion attributes */
                   int xf, nxf = 0;
                   if (debug) fprintf(stderr, "mutating one xform\n");
                   sprintf(action,"mutate xform");
@@ -1124,12 +1136,10 @@ main(argc, argv)
                            cp_orig.xform[xf].c[i][j] = mutation.xform[0].c[i][j];
                   }
                } else if (r < 0.5) {
-                  /* Retains motion */
                   if (debug) fprintf(stderr, "adding symmetry\n");
                   sprintf(action,"mutate symmetry");
                   flam3_add_symmetry(&cp_orig, 0);
                } else if (r < 0.6) {
-                  /* Retains motion */
                   int b = 1 + random()%6;
                   int same = random()&3;
                   if (debug) fprintf(stderr, "setting post xform\n");
@@ -1206,7 +1216,6 @@ main(argc, argv)
                      }
                   }
                } else if (r < 0.7) {
-                  /* Retains motion */
                   double s = flam3_random01();
                   did_color = 1;
                   // change just the color
@@ -1222,7 +1231,6 @@ main(argc, argv)
                      sprintf(action,"mutate color palette");
                   }
                } else if (r < 0.8) {
-                  /* retains motion */
                   int nx = 0;
                   if (debug) fprintf(stderr, "deleting an xform\n");
                   sprintf(action,"mutate delete");
@@ -1254,6 +1262,8 @@ main(argc, argv)
                      }
                   }
                }
+               
+               clear_cp(&mutation,flam3_defaults_on);
 
                if (random()&1) {
                   double bmin[2], bmax[2];
@@ -1390,7 +1400,6 @@ main(argc, argv)
 
                } else if (!strcmp(method, "interpolate")) {
                   /* linearly interpolate somewhere between the two */
-                  /* do not print motion elements */
                   flam3_genome parents[2];
                   double t = flam3_random01();
 
@@ -1406,6 +1415,9 @@ main(argc, argv)
                   parents[0].time = 0.0;
                   parents[1].time = 1.0;
                   flam3_interpolate(parents, 2, t, &cp_orig);
+                  
+                  for (i=0;i<cp_orig.num_xforms;i++)
+                     flam3_delete_motion_elements(&cp_orig.xform[i]);
 
                   /* except pick a simple palette */
                   rb = rbit();
@@ -1572,6 +1584,8 @@ main(argc, argv)
                fraction_black = black_thresh + 1.0;
                fraction_white = white_limit - 1.0;
             }
+            
+            clear_cp(&cp_orig,flam3_defaults_on);
 
             count++;
          } while ((avg_pix < avg_thresh ||
@@ -1614,5 +1628,6 @@ main(argc, argv)
    }
    if (enclosed) printf("</pick>\n");
    free(image);
+      
    return 0;
 }
