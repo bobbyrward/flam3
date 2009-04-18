@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
    char exepath[256];
    char palpath[256];
    memset(exepath,0,256);
-   memset(palpath,0,256)   
+   memset(palpath,0,256); 
 
     slashloc = strrchr(argv[0],'\\');
 	if (NULL==slashloc) {
