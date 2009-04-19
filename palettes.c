@@ -285,7 +285,7 @@ void flam3_calc_newrgb(double *cbuf, double ls, double highpow, double *newrgb) 
    int rgbi;
    double newls,lsratio;
    double newhsv[3];
-   double a, maxa=-1.0, maxc;
+   double a, maxa=-1.0, maxc=0;
    
    /* Identify the most saturated channel */
    for (rgbi=0;rgbi<3;rgbi++) {

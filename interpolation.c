@@ -47,8 +47,8 @@ double motion_funcs(int funcnum, double timeval) {
          fr = 4.0 * fr - 4.0;
      
       return(fr);
-   } else if (funcnum==MOTION_COS) {
-      return(1.0-cos(2.0*M_PI*timeval));
+   } else { //if (funcnum==MOTION_HILL) {
+      return( (1.0-cos(2.0*M_PI*timeval)) * 0.5);
    }
    
 }
@@ -531,7 +531,6 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
          INTERP(xform[i].var[j]);
 
       if (flam3_inttype_log == cpi[0].interpolation_type) {
-         int col;
          double cxmag[4][2];  // XXX why only 4? should be ncp
          double cxang[4][2];
          double cxtrn[4][2];

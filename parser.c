@@ -193,7 +193,6 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
    int solo_xform=-1;
    char *att_str;
    int num_std_xforms=-1;
-   char *cpy;
    char tmps[2];
    int i;
    int ix = 0;
@@ -731,15 +730,15 @@ int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_xaos,
          this_xform->color_speed = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"animate")) {
          this_xform->animate = flam3_atof(att_str);
-      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"motion_freq")) {
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"motion_frequency")) {
          this_xform->motion_freq = flam3_atoi(att_str);
-      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"motion_func")) {
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"motion_function")) {
          if (!strcmp("sin", att_str)) {
             this_xform->motion_func = MOTION_SIN;
          } else if (!strcmp("triangle",att_str)) {
             this_xform->motion_func = MOTION_TRIANGLE;
-         } else if (!strcmp("cos",att_str)) {
-            this_xform->motion_func = MOTION_COS;
+         } else if (!strcmp("hill",att_str)) {
+            this_xform->motion_func = MOTION_HILL;
          } else {
             fprintf(stderr,"Error: unknown motion function '%s'\n",att_str);
             xmlFree(att_str);

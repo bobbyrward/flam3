@@ -38,7 +38,6 @@ int main(int argc, char **argv) {
   int transparency = argi("transparency", 0);
   int bits = argi("bits", 33);
   int bpc = argi("bpc",8);
-  int seed = argi("seed", 0);
   int earlyclip = argi("earlyclip",0);
   int ftime, channels;
   unsigned char *image;

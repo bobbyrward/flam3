@@ -605,7 +605,7 @@ flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag);
 /* Motion function indices */
 #define MOTION_SIN 1
 #define MOTION_TRIANGLE 2
-#define MOTION_COS 3
+#define MOTION_HILL 3
 
 
 #endif

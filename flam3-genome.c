@@ -251,8 +251,7 @@ void spin(int frame, double blend, flam3_genome *parent, flam3_genome *templ)
    flam3_genome *result;
    char action[50];
    xmlDocPtr doc;
-   int i;
-
+   
    /* Spin the parent blend*360 degrees */
    result = sheep_loop(parent,blend);
 
@@ -579,7 +578,6 @@ main(argc, argv)
    double speed = argf("speed", 0.1);
    int bits = argi("bits", 33);
    int ntries = argi("tries", 10);
-   int seed = argi("seed", 0);
    char *use_vars = getenv("use_vars");
    char *dont_use_vars = getenv("dont_use_vars");
    flam3_genome *parent0=NULL, *parent1=NULL;

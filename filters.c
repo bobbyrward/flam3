@@ -279,7 +279,7 @@ flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double c
    double comp_max_radius, comp_min_radius;
    double num_de_filters_d;
    int num_de_filters,de_max_ind;
-   int de_row_size, de_half_size, de_kernel_index;
+   int de_row_size, de_half_size;
    int filtloop;
    int keep_thresh=100;
 
@@ -332,7 +332,6 @@ flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double c
       double de_filt_h;
       int dej,dek;
       double adjloop;
-      double coef;
       int filter_coef_idx;
 
       /* Calculate the filter width for this number of hits in a bin */

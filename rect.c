@@ -222,7 +222,6 @@ static void iter_thread(void *fth) {
    static double progress_history[64];
    static int progress_history_mark = 0;
    double eta = 0.0;
-   flam3_palette cmap_scaled;
    
    if (fthp->timer_initialize) {
    	progress_timer = 0;
@@ -323,7 +322,7 @@ static void iter_thread(void *fth) {
          double p0, p1, p00, p11;
          double dbl_index0,dbl_frac;
          double interpcolor[4];
-         int k, ci, color_index0, color_index1;
+         int ci, color_index0;
          double *p = &(fthp->iter_storage[j]);
          bucket *b;
 
@@ -361,11 +360,8 @@ static void iter_thread(void *fth) {
             	   break;
             	else
             	   color_index0++;
-            	   //fprintf(stderr,"- - %f\n",cmap_scaled[color_index0].index);
             }
             
-            //fprintf(stderr,"p[2],ci0 = %f, %d\n",p[2],color_index0);
-
             if (p[3]==1.0) {
                bump_no_overflow(b[0][0], ficp->dmap[color_index0].color[0]);
                bump_no_overflow(b[0][1], ficp->dmap[color_index0].color[1]);
@@ -469,8 +465,6 @@ static void render_rectangle(flam3_frame *spec, void *out,
    int gnm_idx,max_gnm_de_fw,de_offset;
    flam3_genome cp;
    unsigned short *xform_distrib;
-   int num_std_xf;
-   char *ai;
    flam3_iter_constants fic;
    flam3_thread_helper *fth;
 #ifdef HAVE_LIBPTHREAD
@@ -939,15 +933,13 @@ static void render_rectangle(flam3_frame *spec, void *out,
    /* filter the accumulation buffer down into the image */
    if (1) {
       int x, y;
-      double t[4],newrgb[3],newhsv[3];
+      double t[4],newrgb[3];
       double g = 1.0 / (gamma / vib_gam_n);
       double tmp,a;
       double alpha,ls;
       int rgbi;
 
       double linrange = cp.gam_lin_thresh;
-      double funcval = pow(linrange,g);
-      double frac;
 
       vibrancy /= vib_gam_n;
       background[0] /= vib_gam_n/256.0;

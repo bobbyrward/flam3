@@ -633,8 +633,6 @@ void flam3_interpolate(flam3_genome cps[], int ncps,
    int i1, i2;
    double c[2];
    flam3_genome cpi[4];
-   int cpsi,xfi;
-   int numstd,n;
 
    if (1 == ncps) {
       flam3_copy(result, &(cps[0]));
@@ -980,7 +978,6 @@ void flam3_add_xforms(flam3_genome *thiscp, int num_to_add, int interp_padding, 
 void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete) {
 
    int i,j;
-   int nth_std=-1;
    int num_std = thiscp->num_xforms - (thiscp->final_xform_index >= 0);
 
    if (thiscp->final_xform_index != idx_to_delete) {
@@ -1017,7 +1014,7 @@ void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete) {
    }
 
    /* Delete the motion elements of the banished xform */
-   flam3_delete_motion_elements(&(thiscp->xform[i]));
+   flam3_delete_motion_elements(&(thiscp->xform[idx_to_delete]));
 
    /* Move all of the xforms down one - this does not require manual motion xform adjustment */
    for (i=idx_to_delete; i<thiscp->num_xforms-1; i++)
@@ -1056,7 +1053,7 @@ void flam3_copy_xform(flam3_xform *dest, flam3_xform *src) {
 /* Copy one control point to another */
 void flam3_copy(flam3_genome *dest, flam3_genome *src) {
    
-   int i,ii,j;
+   int i,ii;
    int numstd;
 
    /* If there are any xforms in dest before the copy, clean them up */
@@ -1096,7 +1093,7 @@ void flam3_copy(flam3_genome *dest, flam3_genome *src) {
 
 void flam3_copyx(flam3_genome *dest, flam3_genome *src, int dest_std_xforms, int dest_final_xform) {
 
-   int i,j,numsrcstd;
+   int i,numsrcstd;
    
    /* If there are any xforms in dest before the copy, clean them up */
    clear_cp(dest, 1);
@@ -1501,7 +1498,7 @@ char *flam3_print_to_string(flam3_genome *cp) {
    
 
 void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_edits) {
-   int i, j,numstd;
+   int i,numstd;
    int flam27_flag;
    char *ai;
    
@@ -1671,13 +1668,13 @@ void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, doub
 
    /* Motion flag will not be set if flam27_flag is set */
    if (motion_flag) {
-      fprintf(f, "      <motion motion_freq=\"%d\" ",x->motion_freq);
+      fprintf(f, "      <motion motion_frequency=\"%d\" ",x->motion_freq);
       if (x->motion_func == MOTION_SIN)
-         fprintf(f, "motion_func=\"sin\" ");
+         fprintf(f, "motion_function=\"sin\" ");
       else if (x->motion_func == MOTION_TRIANGLE)
-         fprintf(f, "motion_func=\"triangle\" ");
-      else if (x->motion_func == MOTION_COS)
-         fprintf(f, "motion_func=\"cos\" ");
+         fprintf(f, "motion_function=\"triangle\" ");
+      else if (x->motion_func == MOTION_HILL)
+         fprintf(f, "motion_function=\"hill\" ");
    } else {
       if (final_flag)
          fprintf(f, "   <finalxform ");
@@ -2262,7 +2259,6 @@ void flam3_add_symmetry(flam3_genome *cp, int sym) {
    int i, j, k;
    double a;
    int result = 0;
-   int orig_xf = cp->num_xforms - (cp->final_xform_index >= 0);
 
    if (0 == sym) {
       static int sym_distrib[] = {
