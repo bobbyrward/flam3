@@ -64,7 +64,7 @@ isaac_seed      random          string to be used in generating random seed.  de
 seed            random          integer seed for random numbers, defaults to time+pid.  deprecated.
 nthreads        auto            number of threads to use (render and animate)
 verbose         0               if non-zero then print progress meter on stderr
-bits            33              also 16, 32, or 64: sets bit-width of internal buffers (33 means 32-bit floating-point)
+bits            33              also 32 or 64: sets bit-width of internal buffers (33 means 32-bit floating-point)
 bpc             8               bits per channel of color: only png supports 16 (render/animate)
 image           filename        replace palette with png, jpg, or ppm image
 use_vars        -1              comma sep list of variation #'s to use when generating a random flame (genome only)
@@ -100,6 +100,7 @@ New in 2.8:
 
 earlyclip       0               enables the early clipping of rgb values for better antialiasing and resizing
                                 defaults to 0 for backwards compatibility
+flam27          0               flam3 2.7 compatibility mode; ensures generated genomes can be used by flam3 2.7.18
                                 
 
 for example:
