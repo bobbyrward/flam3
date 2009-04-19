@@ -428,7 +428,7 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
             cp->palette[ix].index = index;
             ix++;
          } else {
-            fprintf(stderr,"Error:  Color element with bad/missing index attribute (%d)\n",index);
+            fprintf(stderr,"Error:  Color element with bad/missing index attribute (%g)\n",index);
             return(1);
          }
       } else if (!xmlStrcmp(chld_node->name, (const xmlChar *)"colors")) {
