@@ -2957,8 +2957,6 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
 /* 64-bit datatypes */
 #define bucket bucket_double
 #define abucket abucket_double
-#define de_thread_helper de_thread_helper_64
-#define de_thread de_thread_64
 #define abump_no_overflow(dest, delta) do {dest += delta;} while (0)
 #define add_c_to_accum(acc,i,ii,j,jj,wid,hgt,c) do { \
    if ( (j) + (jj) >=0 && (j) + (jj) < (hgt) && (i) + (ii) >=0 && (i) + (ii) < (wid)) { \
@@ -2974,6 +2972,8 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
 #define bump_no_overflow(dest, delta)  do {dest += delta;} while (0)
 #define render_rectangle render_rectangle_double
 #define iter_thread iter_thread_double
+#define de_thread_helper de_thread_helper_64
+#define de_thread de_thread_64
 #include "rect.c"
 #ifdef HAVE_GCC_64BIT_ATOMIC_OPS
    /* multi-threaded */
@@ -2981,9 +2981,13 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
    #undef bump_no_overflow
    #undef render_rectangle
    #undef iter_thread
+   #undef de_thread_helper
+   #undef de_thread
    #define bump_no_overflow(dest, delta)  double_atomic_add(&dest, delta)
    #define render_rectangle render_rectangle_double_mt
    #define iter_thread iter_thread_double_mt
+   #define de_thread_helper de_thread_helper_64_mt
+   #define de_thread de_thread_64_mt
    #include "rect.c"
 #else /* !HAVE_GCC_64BIT_ATOMIC_OPS */
    #define render_rectangle_double_mt render_rectangle_double
@@ -3001,8 +3005,6 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
 /* 32-bit datatypes */
 #define bucket bucket_int
 #define abucket abucket_int
-#define de_thread_helper de_thread_helper_32
-#define de_thread de_thread_32
 #define abump_no_overflow(dest, delta) do { \
    if (UINT_MAX - dest > delta) dest += delta; else dest = UINT_MAX; \
 } while (0)
@@ -3022,6 +3024,8 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
 } while (0)
 #define render_rectangle render_rectangle_int
 #define iter_thread iter_thread_int
+#define de_thread_helper de_thread_helper_32
+#define de_thread de_thread_32
 #include "rect.c"
 #ifdef HAVE_GCC_ATOMIC_OPS
    /* multi-threaded */
@@ -3029,9 +3033,13 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
    #undef bump_no_overflow
    #undef render_rectangle
    #undef iter_thread
+   #undef de_thread_helper
+   #undef de_thread
    #define bump_no_overflow(dest, delta)  uint_atomic_add(&dest, delta)
    #define render_rectangle render_rectangle_int_mt
    #define iter_thread iter_thread_int_mt
+   #define de_thread_helper de_thread_helper_32_mt
+   #define de_thread de_thread_32_mt
    #include "rect.c"
 #else /* !HAVE_GCC_ATOMIC_OPS */
    #define render_rectangle_int_mt render_rectangle_int
@@ -3049,8 +3057,6 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
 /* experimental 32-bit datatypes (called 33) */
 #define bucket bucket_int
 #define abucket abucket_float
-#define de_thread_helper de_thread_helper_33
-#define de_thread de_thread_33
 #define abump_no_overflow(dest, delta) do {dest += delta;} while (0)
 #define add_c_to_accum(acc,i,ii,j,jj,wid,hgt,c) do { \
    if ( (j) + (jj) >=0 && (j) + (jj) < (hgt) && (i) + (ii) >=0 && (i) + (ii) < (wid)) { \
@@ -3068,6 +3074,8 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
 } while (0)
 #define render_rectangle render_rectangle_float
 #define iter_thread iter_thread_float
+#define de_thread_helper de_thread_helper_33
+#define de_thread de_thread_33
 #include "rect.c"
 #ifdef HAVE_GCC_ATOMIC_OPS
    /* multi-threaded */
@@ -3075,9 +3083,13 @@ ushort_atomic_add(unsigned short *dest, unsigned short delta)
    #undef bump_no_overflow
    #undef render_rectangle
    #undef iter_thread
+   #undef de_thread_helper
+   #undef de_thread
    #define bump_no_overflow(dest, delta)  uint_atomic_add(&dest, delta)
    #define render_rectangle render_rectangle_float_mt
    #define iter_thread iter_thread_float_mt
+   #define de_thread_helper de_thread_helper_33_mt
+   #define de_thread de_thread_33_mt
    #include "rect.c"
 #else /* !HAVE_GCC_ATOMIC_OPS */
    #define render_rectangle_float_mt render_rectangle_float

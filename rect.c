@@ -582,7 +582,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
    last_block = (char *) malloc(memory_rqd);
    if (NULL == last_block) {
       fprintf(stderr, "render_rectangle: cannot malloc %g bytes.\n", (double)memory_rqd);
-      fprintf(stderr, "render_rectangle: w=%ld h=%ld nb=%ld.\n", fic.width, fic.height, nbuckets);
+      fprintf(stderr, "render_rectangle: w=%d h=%d nb=%ld.\n", fic.width, fic.height, nbuckets);
       exit(1);
    }
 
