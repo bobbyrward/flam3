@@ -503,7 +503,7 @@ void apply_motion_parameters(flam3_xform *xf, flam3_xform *addto, double blend) 
       APPMOT(density); /* Must ensure > 0 after all is applied */
       APPMOT(color); /* Must ensure [0,1] after all is applied */
       
-      APPMOT(visibility);      
+      APPMOT(opacity);      
       APPMOT(color_speed);
       APPMOT(animate);
       APPMOT(blob_low);
@@ -2162,8 +2162,8 @@ void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, doub
          fprintf(f, "\"");
       }
       
-      if (x->visibility<1.0)
-         fprintf(f, " visibility=\"%g\"",x->visibility);
+      if (x->opacity<1.0)
+         fprintf(f, " opacity=\"%g\"",x->opacity);
                
    }
    

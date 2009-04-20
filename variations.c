@@ -1909,7 +1909,7 @@ void prepare_xform_fn_ptrs(flam3_genome *cp, randctx *rc) {
 
       totnum = 0;
 
-      cp->xform[i].vis_adjusted = adjust_percentage(cp->xform[i].visibility);
+      cp->xform[i].vis_adjusted = adjust_percentage(cp->xform[i].opacity);
 
       cp->xform[i].precalc_angles_flag=0;
       cp->xform[i].precalc_atan_xy_flag=0;
@@ -2248,7 +2248,7 @@ void initialize_xforms(flam3_genome *thiscp, int start_here) {
       thiscp->xform[i].color_speed = 0.0;
       thiscp->xform[i].animate = 0.0;
       thiscp->xform[i].color = i&1;
-      thiscp->xform[i].visibility = 1.0;
+      thiscp->xform[i].opacity = 1.0;
       thiscp->xform[i].var[0] = 1.0;
       thiscp->xform[i].motion_freq = 0;
       thiscp->xform[i].motion_func = 0;

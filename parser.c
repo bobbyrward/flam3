@@ -662,9 +662,9 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
 
    for (i=0;i<num_std_xforms;i++) {
       
-      /* Adjust visibility with solo xform setting */
+      /* Adjust opacity with solo xform setting */
       if (solo_xform>=0 && i!=solo_xform)
-         cp->xform[i].visibility = 0.0;
+         cp->xform[i].opacity = 0.0;
 
    }
       
@@ -835,9 +835,9 @@ int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_xaos,
          }
          
          if (!strcmp("off", att_str))
-            this_xform->visibility = 0.0;
-      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"visibility")) {
-         this_xform->visibility = flam3_atof(att_str);
+            this_xform->opacity = 0.0;
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"opacity")) {
+         this_xform->opacity = flam3_atof(att_str);
          
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"coefs")) {
          for (k=0; k<3; k++) {

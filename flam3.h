@@ -194,7 +194,7 @@ typedef struct xform {
    double color;     /* color coords for this function. 0 - 1 */
    double color_speed;  /* scaling factor on color added to current iteration */
    double animate;      /* whether or not this xform rotates (in sheep) >0 means stationary */
-   double visibility;   /* 0=invisible, 1=totally visible */
+   double opacity;   /* 0=invisible, 1=totally visible */
    double vis_adjusted; /* adjusted visibility for better transitions */
    
    int padding;/* Set to 1 for padding xforms */

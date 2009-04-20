@@ -426,7 +426,7 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
       if (result->xform[i].color<0) result->xform[i].color=0;
       if (result->xform[i].color>1) result->xform[i].color=1;
       
-      INTERP(xform[i].visibility);      
+      INTERP(xform[i].opacity);      
       INTERP(xform[i].color_speed);
       INTERP(xform[i].animate);
       INTERP(xform[i].blob_low);
