@@ -277,13 +277,29 @@ static void iter_thread(void *fth) {
       /* Custom progress function */
       if (ficp->spec->progress) {
          if (fthp->first_thread) {
+         
+            int rv;
+         
             /* Recalculate % done, as the other calculation only updates once per second */
             double percent = 100.0 *
                 ((((sub_batch / (double) ficp->batch_size) + ficp->temporal_sample_num)
                 / ficp->ntemporal_samples) + ficp->batch_num)/ficp->nbatches;
-         
-            if ((*ficp->spec->progress)(ficp->spec->progress_parameter,
-				      percent, 0, eta)) {
+                
+            rv = (*ficp->spec->progress)(ficp->spec->progress_parameter, percent, 0, eta);
+            
+            if (rv==2) { /* PAUSE */
+               
+               struct timespec pauset;
+               pauset.tv_sec = 0;
+               pauset.tv_nsec = 100000000;
+               
+               do {
+                  nanosleep(&pauset,NULL);
+                  rv = (*ficp->spec->progress)(ficp->spec->progress_parameter, percent, 0, eta);
+               } while (rv==2);
+            }
+                  
+            if (rv==1) { /* ABORT */
 				   ficp->aborted = 1;
 #ifdef HAVE_LIBPTHREAD
                pthread_exit((void *)0);
