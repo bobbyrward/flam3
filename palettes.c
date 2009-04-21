@@ -320,90 +320,131 @@ void flam3_calc_newrgb(double *cbuf, double ls, double highpow, double *newrgb) 
    }
 }
 
-
-#if 0
-#if 0
-void
-cmap2image(n, f)
-   int n;
-   FILE *f;
-{
-   int i;
-
-   fprintf(f, "P3\n16 16\n# cmap %d\n255\n", n);
-   for (i = 0; i < 256; i++)
-      fprintf(f, "%d %d %d ",
-	      the_cmaps[n][i][0],
-	      the_cmaps[n][i][1],
-	      the_cmaps[n][i][2]);
-   fprintf(f, "\n");
+static int random_xform(flam3_genome *g, int excluded) {
+   int ntries = 0;
+   while (ntries++ < 100) {
+      int i = random() % g->num_xforms;
+      if (g->xform[i].density > 0.0 && i != excluded)
+         return i;
+   }
+   return -1;
 }
-   
-void
-cmap2image2(n, f)
-   int n;
-   FILE *f;
-{
-   int i, j;
 
-   fprintf(f, "P3\n50 256\n# cmap %d\n255\n", n);
-   for (i = 0; i < 256; i++)
-       for (j = 0; j < 50; j++)
-	   fprintf(f, "%d %d %d ",
-		   the_cmaps[n][i][0],
-		   the_cmaps[n][i][1],
-		   the_cmaps[n][i][2]);
-   fprintf(f, "\n");
-}
-   
-#endif
-main(argc, argv)
-   int argc;
-   char **argv;
-{
-#if 0
-  int i;
-  FILE *f;
 
-  /*  printf("%d\n", vlen(the_cmaps));
-      exit(0); */
-  for (i = 0 ; i < vlen(the_cmaps); i++) {
-    char fname[100];
-    sprintf(fname, "cmap%04d.ppm", i);
-    f = fopen(fname, "w");
-    if (NULL == f) {
-      perror(fname);
-      exit(1);
+static double try_colors(flam3_genome *g, int color_resolution) {
+    int *hist;
+    int i, hits, res = color_resolution;
+    int res3 = res * res * res;
+    flam3_frame f;
+    unsigned char *image, *p;
+    flam3_genome saved;
+    stat_struct stats;
+
+    memset(&saved, 0, sizeof(flam3_genome));
+
+    flam3_copy(&saved, g);
+
+    g->sample_density = 1;
+    g->spatial_oversample = 1;
+    g->estimator = 0.0;
+    g->width = 100; // XXX keep aspect ratio
+    g->height = 100;
+    g->pixels_per_unit = 50;
+    g->nbatches = 1;
+    g->ntemporal_samples = 1;
+
+//    f.temporal_filter_radius = 0.0;
+   flam3_init_frame(&f);
+    f.bits = 32;
+    f.bytes_per_channel=1;
+    f.verbose = 0;
+    f.genomes = g;
+    f.ngenomes = 1;
+    f.earlyclip = 1;
+    f.pixel_aspect_ratio = 1.0;
+    f.progress = 0;
+    f.nthreads = 1;
+        
+    image = (unsigned char *) calloc(g->width * g->height, 3);
+    flam3_render(&f, image, g->width, flam3_field_both, 3, 0, &stats);
+
+    hist = calloc(sizeof(int), res3);
+    p = image;
+    for (i = 0; i < g->height * g->width; i++) {
+       hist[(p[0] * res / 256) +
+            (p[1] * res / 256) * res +
+            (p[2] * res / 256) * res * res]++;
+       p += 3;
     }
-    cmap2image2(i, f);
-    fclose(f);
-  }
-#elsif 0
-   int n = atoi(argv[1]);
-   if (n >= 0 && n < vlen(the_cmaps))
-       cmap2image2(n, stdout);
-   else {
-       fprintf(stderr, "bad cmap index: %d.\n", n);
-       exit(1);
-   }
-#else
-   int i, j;
-   init_palettes("pal.xml");
 
-   printf("<palettes>\n");
-   for (i = 0; i < npalettes; i++) {
-       printf("<palette number=\"%d\" data=\"", the_palettes[i].number);
-       for (j = 0; j < 256; j++) {
-	   printf("00%02x%02x%02x",
-		  the_palettes[i].colors[j][0],
-		  the_palettes[i].colors[j][1],
-		  the_palettes[i].colors[j][2]);
-	   if ((j&7)==7) printf("\n");
+    if (0) {
+       int j, k;
+       for (i = 0; i < res; i++) {
+          fprintf(stderr, "\ni=%d: \n", i);
+          for (j = 0; j < res; j++) {
+             for (k = 0; k < res; k++) {
+                fprintf(stderr, " %5d", hist[i * res * res + j * res + k]);
+             }
+             fprintf(stderr, "\n");
+          }
        }
-       printf("\"/>\n");
-   }
-   printf("</palettes>\n");
+    }
 
-#endif
+    hits = 0;
+    for (i = 0; i < res3; i++) {
+       if (hist[i]) hits++;
+    }
+
+    free(hist);
+    free(image);
+
+    g->sample_density = saved.sample_density;
+    g->width = saved.width;
+    g->height = saved.height;
+    g->spatial_oversample = saved.spatial_oversample;
+    g->pixels_per_unit = saved.pixels_per_unit;
+    g->nbatches = saved.nbatches;
+    g->ntemporal_samples = saved.ntemporal_samples;
+    g->estimator = saved.estimator;
+
+    /* Free xform storage */
+    clear_cp(&saved,flam3_defaults_on);
+
+    return (double) hits / res3;
 }
-#endif
+
+static void change_colors(flam3_genome *g, int change_palette) {
+   int i;
+   int x0, x1;
+   if (change_palette) {
+      g->hue_rotation = 0.0;
+      g->palette_index = flam3_get_palette(flam3_palette_random, g->palette, 0.0);
+   }
+   for (i = 0; i < g->num_xforms; i++) {
+      g->xform[i].color = flam3_random01();
+   }
+   x0 = random_xform(g, -1);
+   x1 = random_xform(g, x0);
+   if (x0 >= 0 && (random()&1)) g->xform[x0].color = 0.0;
+}
+
+void flam3_improve_colors(flam3_genome *g, int ntries, int change_palette, int color_resolution) {
+   int i;
+   double best, b;
+   flam3_genome best_genome;
+
+   memset(&best_genome, 0, sizeof(flam3_genome));
+   best = try_colors(g, color_resolution);
+   flam3_copy(&best_genome,g);
+   for (i = 0; i < ntries; i++) {
+      change_colors(g, change_palette);
+      b = try_colors(g, color_resolution);
+      if (b > best) {
+         best = b;
+         flam3_copy(&best_genome,g);
+      }
+   }
+   flam3_copy(g,&best_genome);
+   clear_cp(&best_genome,flam3_defaults_on);
+}
+

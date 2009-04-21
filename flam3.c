@@ -1163,7 +1163,6 @@ void clear_cp(flam3_genome *cp, int default_flag) {
     cp->symmetry = 0;
     cp->hue_rotation = 0.0;
     cp->rotate = 0.0;
-    cp->edits = NULL; //BAD
     cp->pixels_per_unit = 50;
     cp->interpolation = flam3_interpolation_linear;
     cp->palette_interpolation = flam3_palette_interpolation_hsv;
@@ -1246,10 +1245,6 @@ void clear_cp(flam3_genome *cp, int default_flag) {
        cp->num_xforms = 0;
     }
     
-//    if (NULL != cp->edits)
-//       xmlFreeDoc(cp->edits);
-    
-
     cp->final_xform_enable = 0;
     cp->final_xform_index = -1;
 
@@ -2333,6 +2328,227 @@ void flam3_add_symmetry(flam3_genome *cp, int sym) {
       sizeof(flam3_xform), compare_xforms);
       
 }
+
+char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, int sym, double speed, randctx *rc) {
+
+   double randselect;
+   flam3_genome mutation;
+   int i,j,done;
+   char *mute_action;
+   
+   mute_action = calloc(256,sizeof(char));
+   
+   /* If mutate_mode = -1, choose a random mutation mode */
+   if (mutate_mode == MUTATE_NOT_SPECIFIED) {
+   
+      randselect = flam3_random_isaac_01(rc);
+      
+      if (randselect < 0.1)
+         mutate_mode = MUTATE_ALL_VARIATIONS;
+      else if (randselect < 0.3)
+         mutate_mode = MUTATE_ONE_XFORM_COEFS;
+      else if (randselect < 0.5)
+         mutate_mode = MUTATE_ADD_SYMMETRY;
+      else if (randselect < 0.6)
+         mutate_mode = MUTATE_POST_XFORMS;
+      else if (randselect < 0.7)
+         mutate_mode = MUTATE_COLOR_PALETTE;
+      else if (randselect < 0.8)
+         mutate_mode = MUTATE_DELETE_XFORM;
+      else
+         mutate_mode = MUTATE_ALL_COEFS;
+
+   }
+   
+   memset(&mutation, 0, sizeof(flam3_genome));
+   
+   if (mutate_mode == MUTATE_ALL_VARIATIONS) {
+   
+      sprintf(mute_action,"mutate all variations");
+
+      do {
+         /* Create a random flame, and use the variations */
+         /* to replace those in the original              */
+         flam3_random(&mutation, ivars, ivars_n, sym, cp->num_xforms);
+         for (i = 0; i < cp->num_xforms; i++) {
+            for (j = 0; j < flam3_nvariations; j++) {
+               if (cp->xform[i].var[j] != mutation.xform[i].var[j]) {
+               
+                  /* Copy the new var weights */
+                  cp->xform[i].var[j] = mutation.xform[i].var[j];
+
+                  /* Copy parameters for this variation only */
+                  flam3_copy_params(&(cp->xform[i]),&(mutation.xform[i]),j);
+
+                  done = 1;
+               }
+            }
+         }
+      } while (!done);
+      
+   } else if (mutate_mode == MUTATE_ONE_XFORM_COEFS) {
+   
+      int modxf;
+   
+      /* Generate a 2-xform random */
+      flam3_random(&mutation, ivars, ivars_n, sym, 2);
+      
+      /* Which xform do we mutate? */
+      modxf = ((unsigned)irand(rc)) % cp->num_xforms;
+      
+      sprintf(mute_action,"mutate xform %d coefs",modxf);
+      
+      /* if less than 3 xforms, then change only the translation part */
+      if (2 >= cp->num_xforms) {
+         for (j = 0; j < 2; j++)
+            cp->xform[modxf].c[2][j] = mutation.xform[0].c[2][j];
+      } else {
+         for (i = 0; i < 3; i++)
+            for (j = 0; j < 2; j++)
+               cp->xform[modxf].c[i][j] = mutation.xform[0].c[i][j];
+      }
+      
+   } else if (mutate_mode == MUTATE_ADD_SYMMETRY) {
+   
+      sprintf(mute_action,"mutate symmetry");
+      flam3_add_symmetry(cp, 0);
+      
+   } else if (mutate_mode == MUTATE_POST_XFORMS) {
+   
+      int b = 1 + ((unsigned)irand(rc))%6;
+      int same = ((unsigned)irand(rc))&3; /* 25% chance of using the same post for all of them */
+      
+      sprintf(mute_action,"mutate post xforms %d %s",b, (same>0) ? "same" : "");
+      for (i = 0; i < cp->num_xforms; i++) {
+         int copy = (i > 0) && same;
+
+         if (copy) { /* Copy the post from the first xform to the rest of them */
+            for (j = 0; j < 3; j++) {
+               cp->xform[i].post[j][0] = cp->xform[0].post[j][0];
+               cp->xform[i].post[j][1] = cp->xform[0].post[j][1];
+            }
+
+         } else {
+
+            if (b&1) { /* 50% chance */
+            
+               double f = M_PI * flam3_random_isaac_11(rc);
+               double t[2][2];
+
+               t[0][0] = (cp->xform[i].c[0][0] * cos(f) + cp->xform[i].c[0][1] * -sin(f));
+               t[0][1] = (cp->xform[i].c[0][0] * sin(f) + cp->xform[i].c[0][1] * cos(f));
+               t[1][0] = (cp->xform[i].c[1][0] * cos(f) + cp->xform[i].c[1][1] * -sin(f));
+               t[1][1] = (cp->xform[i].c[1][0] * sin(f) + cp->xform[i].c[1][1] * cos(f));
+
+               cp->xform[i].c[0][0] = t[0][0];
+               cp->xform[i].c[0][1] = t[0][1];
+               cp->xform[i].c[1][0] = t[1][0];
+               cp->xform[i].c[1][1] = t[1][1];
+
+               f *= -1.0;
+
+               t[0][0] = (cp->xform[i].post[0][0] * cos(f) + cp->xform[i].post[0][1] * -sin(f));
+               t[0][1] = (cp->xform[i].post[0][0] * sin(f) + cp->xform[i].post[0][1] * cos(f));
+               t[1][0] = (cp->xform[i].post[1][0] * cos(f) + cp->xform[i].post[1][1] * -sin(f));
+               t[1][1] = (cp->xform[i].post[1][0] * sin(f) + cp->xform[i].post[1][1] * cos(f));
+
+               cp->xform[i].post[0][0] = t[0][0];
+               cp->xform[i].post[0][1] = t[0][1];
+               cp->xform[i].post[1][0] = t[1][0];
+               cp->xform[i].post[1][1] = t[1][1];
+
+            }
+
+            if (b&2) { /* 33% chance */
+            
+               double f = 0.2 + flam3_random_isaac_01(rc);
+               double g = 0.2 + flam3_random_isaac_01(rc);
+
+               if (flam3_random_isaac_bit(rc))
+                  f = 1.0 / f;
+               
+               if (flam3_random_isaac_bit(rc))
+                  g = f;
+               else {               
+                  if (flam3_random_isaac_bit(rc))
+                     g = 1.0 / g;
+               }
+
+               cp->xform[i].c[0][0] /= f;
+               cp->xform[i].c[0][1] /= f;
+               cp->xform[i].c[1][1] /= g;
+               cp->xform[i].c[1][0] /= g;
+               cp->xform[i].post[0][0] *= f;
+               cp->xform[i].post[1][0] *= f;
+               cp->xform[i].post[0][1] *= g;
+               cp->xform[i].post[1][1] *= g;
+            }
+
+            if (b&4) { /* 16% chance */
+
+               double f = flam3_random_isaac_11(rc);
+               double g = flam3_random_isaac_11(rc);
+
+               cp->xform[i].c[2][0] -= f;
+               cp->xform[i].c[2][1] -= g;
+               cp->xform[i].post[2][0] += f;
+               cp->xform[i].post[2][1] += g;
+            }
+         }
+      }
+   } else if (mutate_mode == MUTATE_COLOR_PALETTE) {
+   
+      double s = flam3_random_isaac_01(rc);
+
+      if (s < 0.4) { /* randomize xform color coords */
+      
+         flam3_improve_colors(cp, 100, 0, 10);
+         sprintf(mute_action,"mutate color coords");
+         
+      } else if (s < 0.8) { /* randomize xform color coords and palette */
+      
+         flam3_improve_colors(cp, 25, 1, 10);
+         sprintf(mute_action,"mutate color all");
+         
+      } else { /* randomize palette only */
+
+         cp->palette_index = flam3_get_palette(flam3_palette_random, cp->palette, cp->hue_rotation);
+         sprintf(mute_action,"mutate color palette");
+
+      }
+   } else if (mutate_mode == MUTATE_DELETE_XFORM) {
+   
+      int nx = ((unsigned)irand(rc))%cp->num_xforms;
+      sprintf(mute_action,"mutate delete xform %d",nx);
+
+      if (cp->num_xforms > 1)
+         flam3_delete_xform(cp,nx);
+
+   } else { /* MUTATE_ALL_COEFS */ 
+   
+      int x;
+      sprintf(mute_action,"mutate all coefs");
+      flam3_random(&mutation, ivars, ivars_n, sym, cp->num_xforms);
+
+      /* change all the coefs by a fraction of the random */
+      for (x = 0; x < cp->num_xforms; x++) {
+         for (i = 0; i < 3; i++) {
+            for (j = 0; j < 2; j++) {
+               cp->xform[x].c[i][j] += speed * mutation.xform[x].c[i][j];
+
+            }
+         }
+         /* Eventually, we can mutate the parametric variation coefs here. */
+      }
+   }
+   
+   clear_cp(&mutation,flam3_defaults_on);
+
+   return(mute_action); /* Must free this in calling routine */
+   
+}
+   
+   
 
 static int random_var() {
   return random() % flam3_nvariations;

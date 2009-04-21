@@ -536,12 +536,15 @@ char *flam3_print_to_string(flam3_genome *cp);
 /* spec_xforms specifies the number of xforms to use, setting to 0 makes the number random. */
 void flam3_random(flam3_genome *g, int *ivars, int ivars_n, int sym, int spec_xforms);
 
+char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, int sym, double speed, randctx *rc);
+
 /* return NULL in case of error */
 flam3_genome *flam3_parse_xml2(char *s, char *fn, int default_flag, int *ncps);
 flam3_genome *flam3_parse_from_file(FILE *f, char *fn, int default_flag, int *ncps);
 
 void flam3_add_symmetry(flam3_genome *g, int sym);
 
+void flam3_improve_colors(flam3_genome *g, int ntries, int change_palette, int color_resolution);
 void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist);
 void flam3_estimate_bounding_box(flam3_genome *g, double eps, int nsamples,
              double *bmin, double *bmax, randctx *rc);
@@ -606,6 +609,17 @@ flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag);
 #define MOTION_SIN 1
 #define MOTION_TRIANGLE 2
 #define MOTION_HILL 3
+
+/* Mutation modes */
+#define MUTATE_NOT_SPECIFIED   -1
+#define MUTATE_ALL_VARIATIONS  0
+#define MUTATE_ONE_XFORM_COEFS 1
+#define MUTATE_ADD_SYMMETRY    2
+#define MUTATE_POST_XFORMS     3
+#define MUTATE_COLOR_PALETTE   4
+#define MUTATE_DELETE_XFORM    5
+#define MUTATE_ALL_COEFS       6
+
 
 
 #endif
