@@ -28,7 +28,7 @@
 #include <string.h>
 #include <libxml/parser.h>
 
-#if defined(WIN32) || defined(_MSC_VER)
+#ifdef _WIN32
 #define basename(x) strdup(x)
 #define snprintf _snprintf
 #define _USE_MATH_DEFINES
@@ -49,7 +49,7 @@
 #define vlen(x) (sizeof(x)/sizeof(*x))
 
 
-#if defined(WIN32) || defined(_MSC_VER)
+#ifdef _WIN32
 
 #ifndef M_PI
    #define M_PI   3.1415926536

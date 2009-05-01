@@ -44,7 +44,7 @@
 #include <mach/mach_error.h>
 #define flam3_os "OSX"
 #else
-#if defined(WIN32) || defined(_MSC_VER)
+#ifdef _WIN32
 #define WINVER 0x0500
 #include <windows.h>
 #define flam3_os "WIN"
@@ -1261,7 +1261,7 @@ int flam3_count_nthreads(void) {
    return(1);
 #endif
 
-#if defined(WIN32) || defined(_MSC_VER)
+#ifdef _WIN32
    SYSTEM_INFO sysInfo;
    GetSystemInfo(&sysInfo);
    nthreads = sysInfo.dwNumberOfProcessors;

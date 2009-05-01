@@ -294,7 +294,7 @@ static void iter_thread(void *fth) {
                pauset.tv_nsec = 100000000;
                
                do {
-#if defined(_MSC_VER)
+#if defined(_WIN32) /* mingw or msvc */
 				   Sleep(100);
 #else
 				   nanosleep(&pauset,NULL);

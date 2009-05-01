@@ -27,7 +27,7 @@
 #include "flam3.h"
 #include "private.h"
 
-#if defined(WIN32) || defined(_MSC_VER)
+#ifdef _WIN32
 #include <winsock.h> /* for htons */
 #else
 #include <arpa/inet.h>
