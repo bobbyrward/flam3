@@ -294,7 +294,11 @@ static void iter_thread(void *fth) {
                pauset.tv_nsec = 100000000;
                
                do {
-                  nanosleep(&pauset,NULL);
+#if defined(_WIN32)
+				   Sleep(100);
+#else
+				   nanosleep(&pauset,NULL);
+#endif
                   rv = (*ficp->spec->progress)(ficp->spec->progress_parameter, percent, 0, eta);
                } while (rv==2);
             }
@@ -525,7 +529,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
       image_height = spec->genomes[0].height / 2;
       
       if (field == flam3_field_odd)
-         out += nchan * bytes_per_channel * out_width;
+         out = (unsigned char *)out + nchan * bytes_per_channel * out_width;
          
       out_width *= 2;
    } else
@@ -1041,7 +1045,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
                }
             }
 
-            p = out + nchan * bytes_per_channel * (i + j * out_width);
+            p = (unsigned char *)out + nchan * bytes_per_channel * (i + j * out_width);
             p8 = (unsigned char *)p;
             p16 = (unsigned short *)p;
             
@@ -1152,7 +1156,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
      /* insert the palette into the image */
      for (j = 0; j < ph; j++) {
        for (i = 0; i < image_width; i++) {
-	 unsigned char *p = out + nchan * (i + j * out_width);
+	 unsigned char *p = (unsigned char *)out + nchan * (i + j * out_width);
 	 p[0] = (unsigned char)dmap[i * 256 / image_width].color[0];
 	 p[1] = (unsigned char)dmap[i * 256 / image_width].color[1];
 	 p[2] = (unsigned char)dmap[i * 256 / image_width].color[2];

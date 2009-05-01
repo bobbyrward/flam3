@@ -23,18 +23,21 @@
 
 #include <stdlib.h>
 
-#include <math.h>
 #include <ctype.h>
 #include <time.h>
 #include <string.h>
 #include <libxml/parser.h>
 
-#ifndef WIN32
+#if defined(WIN32) || defined(_WIN32)
+#define basename(x) strdup(x)
+#define snprintf _snprintf
+#define _USE_MATH_DEFINES
+#else
 #include <unistd.h>
 #include <libgen.h>
-#else
-#define basename(x) strdup(x)
 #endif
+
+#include <math.h>
 
 #define PREFILTER_WHITE 255
 #define EPS (1e-10)
@@ -46,7 +49,7 @@
 #define vlen(x) (sizeof(x)/sizeof(*x))
 
 
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
 
 #ifndef M_PI
    #define M_PI   3.1415926536

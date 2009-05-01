@@ -27,7 +27,7 @@
 #include "flam3.h"
 #include "private.h"
 
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
 #include <winsock.h> /* for htons */
 #else
 #include <arpa/inet.h>
@@ -79,7 +79,7 @@ void write_png(FILE *file, void *image, int width, int height, flam3_img_comment
   text[7].text = fpc->genome;
 
   for (i = 0; i < height; i++)
-    rows[i] = image + i * width * 4 * bpc;
+    rows[i] = (unsigned char *)image + i * width * 4 * bpc;
       
   png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
 				    NULL, NULL, NULL);

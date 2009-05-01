@@ -24,8 +24,14 @@
 #include <libxml/parser.h>
 #include "isaac.h"
 
+#if defined(_WIN32) /* VC++ */
+#include <windows.h>
+#define EXPORT __declspec (dllexport)
+#else
+#define EXPORT
+#endif
 
-char *flam3_version();
+EXPORT char *flam3_version();
 
 #define flam3_palette_random       (-1)
 #define flam3_palette_interpolated (-2)
@@ -502,8 +508,8 @@ void flam3_copyx(flam3_genome *dest, flam3_genome *src, int num_std, int num_fin
 void flam3_copy_params(flam3_xform *dest, flam3_xform *src, int varn);
 void flam3_delete_motion_elements(flam3_xform *xf);
 
-void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc);
-unsigned short* flam3_create_xform_distrib(flam3_genome *cp);
+EXPORT void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc);
+EXPORT unsigned short* flam3_create_xform_distrib(flam3_genome *cp);
 void flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_distrib);
 int flam3_check_unity_chaos(flam3_genome *cp);
 void clear_cp(flam3_genome *cp, int def_flag);
@@ -513,7 +519,7 @@ void clear_cp(flam3_genome *cp, int def_flag);
    (samples[2], samples[3]) as starting color coordinate,
    perform fuse iterations and throw them away, then perform
    nsamples iterations and save them in the samples array */
-int flam3_iterate(flam3_genome *g, int nsamples, int fuse, double *samples,
+EXPORT int flam3_iterate(flam3_genome *g, int nsamples, int fuse, double *samples,
                      unsigned short *xform_distrib, randctx *rc);
 
 void apply_motion_parameters(flam3_xform *xf, flam3_xform *addto, double blend);
@@ -534,18 +540,18 @@ char *flam3_print_to_string(flam3_genome *cp);
 /* ivars_n is the number of values in ivars to select from.            */
 /* sym is either a symmetry group or 0 meaning random or no symmetry   */
 /* spec_xforms specifies the number of xforms to use, setting to 0 makes the number random. */
-void flam3_random(flam3_genome *g, int *ivars, int ivars_n, int sym, int spec_xforms);
+EXPORT void flam3_random(flam3_genome *g, int *ivars, int ivars_n, int sym, int spec_xforms);
 
 char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, int sym, double speed, randctx *rc);
 
 /* return NULL in case of error */
-flam3_genome *flam3_parse_xml2(char *s, char *fn, int default_flag, int *ncps);
+EXPORT flam3_genome *flam3_parse_xml2(char *s, char *fn, int default_flag, int *ncps);
 flam3_genome *flam3_parse_from_file(FILE *f, char *fn, int default_flag, int *ncps);
 
 void flam3_add_symmetry(flam3_genome *g, int sym);
 
 void flam3_improve_colors(flam3_genome *g, int ntries, int change_palette, int color_resolution);
-void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist);
+EXPORT void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist);
 void flam3_estimate_bounding_box(flam3_genome *g, double eps, int nsamples,
              double *bmin, double *bmax, randctx *rc);
 void flam3_rotate(flam3_genome *g, double angle, int interp_type); /* angle in degrees */
@@ -555,7 +561,7 @@ double flam3_lyapunov(flam3_genome *g, int ntries);
 
 void flam3_apply_template(flam3_genome *cp, flam3_genome *templ);
 
-int flam3_count_nthreads(void);
+EXPORT int flam3_count_nthreads(void);
 
 typedef struct {
 //   double         temporal_filter_radius;
@@ -580,9 +586,9 @@ typedef struct {
 
 /* out is pixel array with stride of out_width.
    pixels are rgb or rgba if nchan is 3 or 4. */
-void flam3_render(flam3_frame *f, void *out, int out_width, int field, int nchan, int transp, stat_struct *stats);
+EXPORT void flam3_render(flam3_frame *f, void *out, int out_width, int field, int nchan, int transp, stat_struct *stats);
 
-double flam3_render_memory_required(flam3_frame *f);
+EXPORT double flam3_render_memory_required(flam3_frame *f);
 
 
 double flam3_random01();
@@ -594,11 +600,11 @@ double flam3_random_isaac_01(randctx *);
 double flam3_random_isaac_11(randctx *);
 int flam3_random_isaac_bit(randctx *);
 
-void flam3_init_frame(flam3_frame *f);
+EXPORT void flam3_init_frame(flam3_frame *f);
 
 /* External memory helpers */
-void *flam3_malloc(size_t size);
-void flam3_free(void *ptr);
+EXPORT void *flam3_malloc(size_t size);
+EXPORT void flam3_free(void *ptr);
 
 void flam3_srandom();
 

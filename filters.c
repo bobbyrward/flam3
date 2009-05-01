@@ -304,12 +304,12 @@ flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double c
    /*    num filters = (de_max_width / de_min_width)^(1/estimator_curve)    */
    /*                                                                       */
    num_de_filters_d = pow( comp_max_radius/comp_min_radius, 1.0/curve );
-   num_de_filters = ceil(num_de_filters_d);
+   num_de_filters = (int)ceil(num_de_filters_d);
          
    /* Condense the smaller kernels to save space */
    if (num_de_filters>keep_thresh) { 
-      de_max_ind = ceil(DE_THRESH + pow(num_de_filters-DE_THRESH,curve))+1;
-      de.max_filtered_counts = pow( (double)(de_max_ind-DE_THRESH), 1.0/curve) + DE_THRESH;
+      de_max_ind = (int)ceil(DE_THRESH + pow(num_de_filters-DE_THRESH,curve))+1;
+      de.max_filtered_counts = (int)pow( (double)(de_max_ind-DE_THRESH), 1.0/curve) + DE_THRESH;
    } else {
       de_max_ind = num_de_filters;
       de.max_filtered_counts = de_max_ind;
@@ -317,7 +317,7 @@ flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double c
 
    /* Allocate the memory for these filters */
    /* and the hit/width lookup vector       */
-   de_row_size = 2*ceil(comp_max_radius)-1;
+   de_row_size = (int)(2*ceil(comp_max_radius)-1);
    de_half_size = (de_row_size-1)/2;
    de.kernel_size = (de_half_size+1)*(2+de_half_size)/2;
 

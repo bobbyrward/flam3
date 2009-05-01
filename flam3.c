@@ -16,7 +16,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef _WIN32 /* VC++ */
 #define _GNU_SOURCE
+#endif
 
 #include "private.h"
 #include "img.h"
@@ -28,7 +30,9 @@
 #include "palettes.h"
 #include <limits.h>
 #include <math.h>
+#ifdef HAVE_STDINT_H
 #include <stdint.h>
+#endif
 #include <errno.h>
 
 #ifdef HAVE_LIBPTHREAD
@@ -40,7 +44,7 @@
 #include <mach/mach_error.h>
 #define flam3_os "OSX"
 #else
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
 #define WINVER 0x0500
 #include <windows.h>
 #define flam3_os "WIN"
@@ -1257,7 +1261,7 @@ int flam3_count_nthreads(void) {
    return(1);
 #endif
 
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
    SYSTEM_INFO sysInfo;
    GetSystemInfo(&sysInfo);
    nthreads = sysInfo.dwNumberOfProcessors;
