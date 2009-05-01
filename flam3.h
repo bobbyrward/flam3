@@ -24,7 +24,7 @@
 #include <libxml/parser.h>
 #include "isaac.h"
 
-#if defined(_WIN32) /* VC++ */
+#if defined(_MSC_VER) /* VC++ */
 #include <windows.h>
 #define EXPORT __declspec (dllexport)
 #else
