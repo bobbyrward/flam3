@@ -277,9 +277,11 @@ void spin_inter(int frame, double blend, int seqflag, flam3_genome *parents, fla
    flam3_genome *result;
    char action[50];
    xmlDocPtr doc;
+   char *ai;
+   double stagger = argf("stagger", 0.0);
 
    /* Interpolate between spun parents */
-   result = sheep_edge(parents, blend, seqflag);
+   result = sheep_edge(parents, blend, seqflag, stagger);
 
    /* Unsure why we check for random palettes on both ends... */  
    if ((parents[0].palette_index != flam3_palette_random) &&
@@ -321,17 +323,6 @@ void spin_inter(int frame, double blend, int seqflag, flam3_genome *parents, fla
    /* Free genome storage */
    clear_cp(result,flam3_defaults_on);
    free(result);
-}
-
-void add_to_action(char *action, char *addtoaction) {
-
-   int alen = strlen(action);
-   int addlen = strlen(addtoaction);
-
-   if (alen+addlen < flam3_max_action_length)
-      strcat(action,addtoaction);
-   else
-      fprintf(stderr,"action string too long, truncating...\n");
 }
 
 void truncate_variations(flam3_genome *g, int max_vars, char *action) {
@@ -603,8 +594,8 @@ main(argc, argv)
       exit(1);
    }
 
-   if (method && (!cross0)) {
-      fprintf(stderr, "cannot specify method unless doing crossover.\n");
+   if (method && (!cross0 && !mutate)) {
+      fprintf(stderr, "cannot specify method unless doing crossover or mutate.\n");
       exit(1);
    }
 
@@ -680,7 +671,7 @@ main(argc, argv)
             }
          }
          if (iscp==0) {
-            flam3_interpolate(cp, ncp, (double)ftime, &interpolated);
+            flam3_interpolate(cp, ncp, (double)ftime, 0, &interpolated);
             for (i=0;i<ncp;i++) {
                if ( ftime==cp[i].time-1 ) {
                   iscp=1;
@@ -873,10 +864,10 @@ main(argc, argv)
             if (verbose) fprintf(stderr, ".");
             did_color = 0;
             f.time = (double) 0.0;
+            action[0] = 0;
 
             if (mutate) {
-            
-               char *mute_action;
+               int mutmeth;
 
                parent0 = string_to_cp(mutate, &parent0_n);
                flam3_copy(&selp0, &(parent0[((unsigned)irand(&f.rc))%parent0_n]));
@@ -884,15 +875,33 @@ main(argc, argv)
                aselp0 = &selp0;
                aselp1 = NULL;
 
-               mute_action = flam3_mutate(&cp_orig, MUTATE_NOT_SPECIFIED, ivars, num_ivars, sym, speed, &f.rc);
+               if (NULL == getenv("method"))
+                  mutmeth = MUTATE_NOT_SPECIFIED;
+               else if (!strcmp(method,"all_vars"))
+                  mutmeth = MUTATE_ALL_VARIATIONS;
+               else if (!strcmp(method,"one_xform"))
+                  mutmeth = MUTATE_ONE_XFORM_COEFS;
+               else if (!strcmp(method,"add_symmetry"))
+                  mutmeth = MUTATE_ADD_SYMMETRY;
+               else if (!strcmp(method,"post_xforms"))
+                  mutmeth = MUTATE_POST_XFORMS;
+               else if (!strcmp(method,"color_palette"))
+                  mutmeth = MUTATE_COLOR_PALETTE;
+               else if (!strcmp(method,"delete_xform"))
+                  mutmeth = MUTATE_DELETE_XFORM;
+               else if (!strcmp(method,"all_coefs"))
+                  mutmeth = MUTATE_ALL_COEFS;
+               else {
+                  fprintf(stderr,"method '%s' not defined for mutate.  defaulting to random.\n",method);
+                  mutmeth = MUTATE_NOT_SPECIFIED;
+               }
+
+               flam3_mutate(&cp_orig, mutmeth, ivars, num_ivars, sym, speed, &f.rc, action);
                
                /* Scan string returned for 'mutate color' */
-               if ( strstr(mute_action,"mutate color") )
+               if ( strstr(action,"mutate color") )
                   did_color = 1;
                   
-               sprintf(action,"%s",mute_action);
-               free(mute_action);
-
                if (flam3_random_isaac_bit(&f.rc)) {
                   double bmin[2], bmax[2];
                   flam3_estimate_bounding_box(&cp_orig, 0.01, 100000, bmin, bmax, &f.rc);
@@ -912,32 +921,12 @@ main(argc, argv)
                }
 
             } else if (cross0) {
-               int i0, i1, rb, used_parent;
-               char ministr[10];
+               int i0, i1;
+               int crossmeth;
 
                parent0 = string_to_cp(cross0, &parent0_n);
                parent1 = string_to_cp(cross1, &parent1_n);
 
-               if (NULL == getenv("method")) {
-                  double s = flam3_random01();
-                  if (s < 0.1)
-                     method = "union";
-                  else if (s < 0.2)
-                     method = "interpolate";
-                  else
-                     method = "alternate";
-               }
-
-               if (strcmp(method, "alternate") &&
-                   strcmp(method, "interpolate") &&
-                   strcmp(method, "union")) {
-                  fprintf(stderr,
-                  "method must be either alternate, interpolate, "
-                  "or union, not %s.\n", method);
-                  exit(1);
-               }
-
-               sprintf(action,"cross %s",method);
                i0 = random()%parent0_n;
                i1 = random()%parent1_n;
 
@@ -947,178 +936,20 @@ main(argc, argv)
                aselp0 = &selp0;
                aselp1 = &selp1;
 
-
-               if (!strcmp(method, "alternate")) {
-                  int got0, got1;
-                  char *trystr;
-
-                  trystr = calloc(4 * (parent1[i1].num_xforms + parent0[i0].num_xforms), sizeof(char));
-
-                  /* each xform from a random parent,
-                  possible for one to be excluded */
-                  do {
-
-                     trystr[0] = 0;
-                     got0 = got1 = 0;
-                     rb = rbit();
-                     sprintf(ministr," %d:",rb);
-                     strcat(trystr,ministr);
-
-                     /* Copy the parent, sorting the final xform to the end if it's present. */
-                     if (rb)
-                        flam3_copyx(&cp_orig, &(parent1[i1]),
-                           parent1[i1].num_xforms - (parent1[i1].final_xform_index > 0),
-                           parent1[i1].final_xform_enable);
-                     else
-                        flam3_copyx(&cp_orig, &(parent0[i0]),
-                           parent0[i0].num_xforms - (parent0[i0].final_xform_index > 0),
-                           parent0[i0].final_xform_enable);
-
-                     used_parent = rb;
-
-                     /* Only replace non-final xforms */
-
-                     for (i = 0; i < cp_orig.num_xforms - cp_orig.final_xform_enable; i++) {
-                        rb = rbit();
-
-                        /* Replace xform if bit is 1 */
-                        if (rb==1) {
-                           if (used_parent==0) {
-                              if (i < parent1[i1].num_xforms && parent1[i1].xform[i].density > 0) {
-                                 flam3_copy_xform(&cp_orig.xform[i],&parent1[i1].xform[i]);
-                                 sprintf(ministr," 1");
-                                 got1 = 1;
-                              } else {
-                                 sprintf(ministr," 0");
-                                 got0 = 1;
-                              }
-                           } else {
-                              if (i < parent0[i0].num_xforms && parent0[i0].xform[i].density > 0) {
-                                 flam3_copy_xform(&cp_orig.xform[i],&parent0[i0].xform[i]);
-                                 sprintf(ministr," 0");
-                                 got0 = 1;
-                              } else {
-                                 sprintf(ministr," 1");
-                                 got1 = 1;
-                              }
-                           }
-                        } else {
-                           sprintf(ministr," %d",used_parent);
-                           if (used_parent)
-                              got1 = 1;
-                           else
-                              got0 = 1;
-                        }
-
-                        strcat(trystr,ministr);
-                     }
-             
-                     if (used_parent==0 && parent0[i0].final_xform_enable)
-                        got0 = 1;
-                     else if (used_parent==1 && parent1[i1].final_xform_enable)
-                        got1 = 1;
-               
-                  } while ((i > 1) && !(got0 && got1));
-
-                  add_to_action(action,trystr);
-                  free(trystr);
-
-               } else if (!strcmp(method, "interpolate")) {
-                  /* linearly interpolate somewhere between the two */
-                  flam3_genome parents[2];
-                  double t = flam3_random01();
-
-                  memset(parents, 0, 2*sizeof(flam3_genome));
-
-
-                  sprintf(ministr," %g",t);
-                  //strcat(action,ministr);
-                  add_to_action(action,ministr);
-
-                  flam3_copy(&(parents[0]), &(parent0[i0]));
-                  flam3_copy(&(parents[1]), &(parent1[i1]));
-                  parents[0].time = 0.0;
-                  parents[1].time = 1.0;
-                  flam3_interpolate(parents, 2, t, &cp_orig);
-                  
-                  for (i=0;i<cp_orig.num_xforms;i++)
-                     flam3_delete_motion_elements(&cp_orig.xform[i]);
-
-                  /* except pick a simple palette */
-                  rb = rbit();
-                  sprintf(ministr," %d",rb);
-                  //strcat(action,ministr);
-                  add_to_action(action,ministr);
-                  cp_orig.palette_index = rb ? parent1[i1].palette_index : parent0[i0].palette_index;
-
-                  clear_cp(&parents[0],flam3_defaults_on);
-                  clear_cp(&parents[1],flam3_defaults_on);
-
-               } else {
-	       
-                  flam3_xform mycopy;
-                  /* union */
-                  flam3_copy(&cp_orig, &(parent0[i0]));
-
-                  i = 0;
-                  for (j = 0; j < parent1[i1].num_xforms; j++) {
-                     /* Skip over the final xform, if it's present.    */
-                     /* Default behavior keeps the final from parent0. */
-                     if (parent1[i1].final_xform_index == j)		     
-                        continue;
-                     flam3_add_xforms(&cp_orig, 1, 0, 0);
-                     flam3_copy_xform(&cp_orig.xform[cp_orig.num_xforms-1],&parent1[i1].xform[j]);
-                  }
-		  
-                  /* Put the final xform last (if there is one) */
-                  /* We do not need to do complicated xform copies here since we're just moving them around */
-                  if (cp_orig.final_xform_index >= 0) {
-                     mycopy = cp_orig.xform[cp_orig.final_xform_index];
-                     cp_orig.xform[cp_orig.final_xform_index] = cp_orig.xform[cp_orig.num_xforms-1];
-                     cp_orig.xform[cp_orig.num_xforms-1] = mycopy;
-                     cp_orig.final_xform_index = cp_orig.num_xforms-1;
-                  }
-		     
+               if (NULL == getenv("method"))
+                  crossmeth = CROSS_NOT_SPECIFIED;
+               else if (!strcmp(method,"union"))
+                  crossmeth = CROSS_UNION;
+               else if (!strcmp(method,"interpolate"))
+                  crossmeth = CROSS_INTERPOLATE;
+               else if (!strcmp(method,"alternate"))
+                  crossmeth = CROSS_ALTERNATE;
+               else {
+                  fprintf(stderr,"method '%s' not defined for cross.  defaulting to random.\n",method);
+                  crossmeth = CROSS_NOT_SPECIFIED;
                }
 
-               /* reset color coords */
-               if (cp_orig.num_xforms > 0) {
-                  for (i = 0; i < cp_orig.num_xforms; i++) {
-                     cp_orig.xform[i].color = i&1;
-                  }
-               }
-               
-               /* Potentially genetically cross the two colormaps together */
-               if (flam3_random01() < 0.4) {
-                              
-                  /* Select the starting parent */
-                  int startParent=flam3_random_isaac_bit(&f.rc);
-                  int ci;
-                  
-                  if (debug)
-                     fprintf(stderr,"crossing maps...\n");
-                  
-                  //strcat(action," cmap_cross");
-                  add_to_action(action," cmap_cross");
-                  sprintf(ministr," %d:",startParent);
-                  //strcat(action,ministr);
-                  add_to_action(action,ministr);
-                  
-                  /* Loop over the entries, switching to the other parent 1% of the time */
-                  for (ci=0;ci<256;ci++) {
-                     if (flam3_random_isaac_01(&f.rc)<.01) {
-                        startParent = 1-startParent;
-                        sprintf(ministr," %d",ci);
-                        //strcat(action,ministr);
-                        add_to_action(action,ministr);
-                     }
-                     
-                     if (startParent==0)
-                        cp_orig.palette[ci] = parent0[i0].palette[ci];
-                     else
-                        cp_orig.palette[ci] = parent1[i1].palette[ci];
-                  }
-               }
+               flam3_cross(&parent0[i0], &parent1[i1], &cp_orig, crossmeth, &f.rc, action);
 
                if (parent0[i0].flame_name[0] || parent1[i1].flame_name[0]) {
                   snprintf(cp_orig.flame_name, flam3_name_len, "%d of %s x %s", 
@@ -1178,7 +1009,7 @@ main(argc, argv)
             cp_orig.edits = create_new_editdoc(action, aselp0, aselp1);
             flam3_copy(&cp_save, &cp_orig);
             test_cp(&cp_orig);
-            flam3_render(&f, image, cp_orig.width, flam3_field_both, 3, 0, &stats);
+            flam3_render(&f, image, flam3_field_both, 3, 0, &stats);
 
             if (1) {
                int n, tot, totb, totw;

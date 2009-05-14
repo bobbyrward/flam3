@@ -457,8 +457,7 @@ static void iter_thread(void *fth) {
 }
 
 static void render_rectangle(flam3_frame *spec, void *out,
-			     int out_width, int field, int nchan,
-			     int transp, stat_struct *stats) {
+			     int field, int nchan, int transp, stat_struct *stats) {
    long nbuckets;
    int i, j, k, batch_num, temporal_sample_num;
    double nsamples, batch_size;
@@ -468,6 +467,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
    double *filter, *temporal_filter, *temporal_deltas, *batch_filter;
    double ppux=0, ppuy=0;
    int image_width, image_height;    /* size of the image to produce */
+   int out_width;
    int filter_width=0;
    int bytes_per_channel = spec->bytes_per_channel;
    int oversample = spec->genomes[0].spatial_oversample;
@@ -525,6 +525,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
       
    /* Set up the output image dimensions, adjusted for scanline */   
    image_width = spec->genomes[0].width;
+   out_width = image_width;
    if (field) {
       image_height = spec->genomes[0].height / 2;
       
@@ -628,7 +629,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
       /* interpolate and get a control point                      */
       /* ONLY FOR DENSITY FILTER WIDTH PURPOSES                   */
       /* additional interpolation will be done in the temporal_sample loop */
-      flam3_interpolate(spec->genomes, spec->ngenomes, de_time, &cp);
+      flam3_interpolate(spec->genomes, spec->ngenomes, de_time, 0, &cp);
 
       /* if instructed to by the genome, create the density estimation */
       /* filter kernels.  Check boundary conditions as well.           */
@@ -661,7 +662,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
             temporal_deltas[batch_num*ntemporal_samples + temporal_sample_num];
 
          /* Interpolate and get a control point */
-         flam3_interpolate(spec->genomes, spec->ngenomes, temporal_sample_time, &cp);
+         flam3_interpolate(spec->genomes, spec->ngenomes, temporal_sample_time, 0, &cp);
 
          /* Get the xforms ready to render */
          prepare_xform_fn_ptrs(&cp, &spec->rc);

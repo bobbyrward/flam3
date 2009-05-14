@@ -526,10 +526,7 @@ void apply_motion_parameters(flam3_xform *xf, flam3_xform *addto, double blend);
 
 /* genomes is array ngenomes long, with times set and in ascending order.
    interpolate to the requested time and return in result */
-void flam3_interpolate(flam3_genome *genomes, int ngenomes, double time, flam3_genome *result);
-
-/* barycentric coordinates in c */
-void flam3_interpolate_n(flam3_genome *result, int ncp, flam3_genome *cpi, double *c);
+void flam3_interpolate(flam3_genome *genomes, int ngenomes, double time, double stagger, flam3_genome *result);
 
 /* print genome to given file with extra_attributes if not NULL */
 void flam3_print(FILE *f, flam3_genome *g, char *extra_attributes, int print_edits);
@@ -542,7 +539,9 @@ char *flam3_print_to_string(flam3_genome *cp);
 /* spec_xforms specifies the number of xforms to use, setting to 0 makes the number random. */
 EXPORT void flam3_random(flam3_genome *g, int *ivars, int ivars_n, int sym, int spec_xforms);
 
-char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, int sym, double speed, randctx *rc);
+void add_to_action(char *action, char *addtoaction);
+void flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, int sym, double speed, randctx *rc, char *action);
+void flam3_cross(flam3_genome *cp0, flam3_genome *cp1, flam3_genome *out, int cross_mode, randctx *rc, char *action);
 
 /* return NULL in case of error */
 EXPORT flam3_genome *flam3_parse_xml2(char *s, char *fn, int default_flag, int *ncps);
@@ -584,9 +583,9 @@ typedef struct {
 #define flam3_field_even  1
 #define flam3_field_odd   2
 
-/* out is pixel array with stride of out_width.
+/* out is pixel array.
    pixels are rgb or rgba if nchan is 3 or 4. */
-EXPORT void flam3_render(flam3_frame *f, void *out, int out_width, int field, int nchan, int transp, stat_struct *stats);
+EXPORT void flam3_render(flam3_frame *f, void *out, int field, int nchan, int transp, stat_struct *stats);
 
 EXPORT double flam3_render_memory_required(flam3_frame *f);
 
@@ -609,7 +608,7 @@ EXPORT void flam3_free(void *ptr);
 void flam3_srandom();
 
 flam3_genome *sheep_loop(flam3_genome *cp, double blend);
-flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag);
+flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag, double stagger);
 
 /* Motion function indices */
 #define MOTION_SIN 1
@@ -626,6 +625,10 @@ flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag);
 #define MUTATE_DELETE_XFORM    5
 #define MUTATE_ALL_COEFS       6
 
-
+/* Cross modes */
+#define CROSS_NOT_SPECIFIED   -1
+#define CROSS_UNION           0
+#define CROSS_INTERPOLATE     1  
+#define CROSS_ALTERNATE       2
 
 #endif

@@ -355,7 +355,7 @@ static double try_colors(flam3_genome *g, int color_resolution) {
 
 //    f.temporal_filter_radius = 0.0;
    flam3_init_frame(&f);
-    f.bits = 32;
+    f.bits = 33;
     f.bytes_per_channel=1;
     f.verbose = 0;
     f.genomes = g;
@@ -366,7 +366,7 @@ static double try_colors(flam3_genome *g, int color_resolution) {
     f.nthreads = 1;
         
     image = (unsigned char *) calloc(g->width * g->height, 3);
-    flam3_render(&f, image, g->width, flam3_field_both, 3, 0, &stats);
+    flam3_render(&f, image, flam3_field_both, 3, 0, &stats);
 
     hist = calloc(sizeof(int), res3);
     p = image;

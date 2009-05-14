@@ -31,6 +31,9 @@
 double adjust_percentage(double in);
 double motion_funcs(int funcnum, double timeval);
 
+double smoother(double t);
+double get_stagger_coef(double t, double stagger_prc, int num_xforms, int this_xform);
+
 double det_matrix(double s[2][2]);
 int id_matrix(double s[3][2]);
 int zero_matrix(double s[3][2]);
@@ -49,7 +52,7 @@ void convert_linear_to_polar(flam3_genome *cp, int ncps, int xfi, int cflag,
                              double cxang[4][2], double cxmag[4][2], double cxtrn[4][2]);
 
 void interpolate_catmull_rom(flam3_genome cps[], double t, flam3_genome *result);
-void flam3_interpolate_n(flam3_genome *result, int ncp, flam3_genome *cpi, double *c);
+void flam3_interpolate_n(flam3_genome *result, int ncp, flam3_genome *cpi, double *c, double stagger);
 void establish_asymmetric_refangles(flam3_genome *cp, int ncps);
 void flam3_align(flam3_genome *dst, flam3_genome *src, int nsrc);
 #endif

@@ -364,12 +364,10 @@ flam3_genome *sheep_loop(flam3_genome *cp, double blend) {
    return(result);
 }
 
-double smoother(double t) {
-  return 3*t*t - 2*t*t*t;
-}
 
 
-flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag) {
+
+flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag, double stagger) {
 
    flam3_genome spun[2];
    flam3_genome prealign[2];
@@ -418,7 +416,7 @@ flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag) {
       flam3_rotate(&spun[1], blend*360.0, spun[0].interpolation_type);
 
       /* Now call the interpolation */
-      flam3_interpolate(spun, 2, smoother(blend), result);
+      flam3_interpolate(spun, 2, smoother(blend), stagger, result);
 
      /* Interpolation type no longer needs to be forced to linear mode */
 //     if (!seqflag)
@@ -633,7 +631,7 @@ void apply_motion_parameters(flam3_xform *xf, flam3_xform *addto, double blend) 
  * passed in CPS.  CPS must be sorted by time.
  */
 void flam3_interpolate(flam3_genome cps[], int ncps,
-             double time, flam3_genome *result) {
+             double time, double stagger, flam3_genome *result) {
    int i1, i2;
    double c[2];
    flam3_genome cpi[4];
@@ -697,7 +695,7 @@ void flam3_interpolate(flam3_genome cps[], int ncps,
    result->palette_interpolation = flam3_palette_interpolation_hsv;
 
    if (flam3_interpolation_linear == cps[i1].interpolation) {
-       flam3_interpolate_n(result, 2, cpi, c);
+       flam3_interpolate_n(result, 2, cpi, c, stagger);
    } else {
        interpolate_catmull_rom(cpi, c[1], result);
        clear_cp(&(cpi[2]),0);
@@ -2333,14 +2331,204 @@ void flam3_add_symmetry(flam3_genome *cp, int sym) {
       
 }
 
-char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, int sym, double speed, randctx *rc) {
+void add_to_action(char *action, char *addtoaction) {
+
+   /* action is a flam3_max_action_length array */
+   if (action != NULL) {
+
+      int alen = strlen(action);
+      int addlen = strlen(addtoaction);
+
+      if (alen+addlen < flam3_max_action_length)
+         strcat(action,addtoaction);
+      else
+         fprintf(stderr,"action string too long, truncating...\n");
+   }
+}
+
+
+void flam3_cross(flam3_genome *cp0, flam3_genome *cp1, flam3_genome *out, int cross_mode, randctx *rc, char *action) {
+
+   int i0,i1, i,j, rb;
+   char ministr[10];   
+
+   if (cross_mode == CROSS_NOT_SPECIFIED) {
+   
+      double s = flam3_random_isaac_01(rc);
+      
+      if (s < 0.1)
+         cross_mode = CROSS_UNION;
+      else if (s < 0.2)
+         cross_mode = CROSS_INTERPOLATE;
+      else
+         cross_mode = CROSS_ALTERNATE;
+
+   }
+   
+   if (cross_mode == CROSS_UNION) {
+   
+      flam3_xform mycopy;
+   
+      /* Make a copy of cp0 */
+      flam3_copy(out, cp0);
+      
+      for (j=0;j<cp1->num_xforms;j++) {
+         /* Skip over the final xform, if it's present.    */
+         /* Default behavior keeps the final from parent0. */
+         if (cp1->final_xform_index == j)		     
+            continue;
+         flam3_add_xforms(out, 1, 0, 0);
+         flam3_copy_xform(&out->xform[out->num_xforms-1],&cp1->xform[j]);
+      }
+      
+      /* Put the final xform last (if there is one) */
+      /* We do not need to do complicated xform copies here since we're just moving them around */
+      if (out->final_xform_index >= 0) {
+         mycopy = out->xform[out->final_xform_index];
+         out->xform[out->final_xform_index] = out->xform[out->num_xforms-1];
+         out->xform[out->num_xforms-1] = mycopy;
+         out->final_xform_index = out->num_xforms-1;
+      }
+      
+      add_to_action(action,"cross union");
+      
+   } else if (cross_mode == CROSS_INTERPOLATE) {
+   
+      /* linearly interpolate somewhere between the two */
+      flam3_genome parents[2];
+      double t = flam3_random_isaac_01(rc);
+
+      memset(parents, 0, 2*sizeof(flam3_genome));
+
+      flam3_copy(&(parents[0]), cp0);
+      flam3_copy(&(parents[1]), cp1);
+
+      parents[0].time = 0.0;
+      parents[1].time = 1.0;
+      flam3_interpolate(parents, 2, t, 0, out);
+      
+      for (i=0;i<out->num_xforms;i++)
+         flam3_delete_motion_elements(&out->xform[i]);
+         
+      clear_cp(&parents[0],flam3_defaults_on);
+      clear_cp(&parents[1],flam3_defaults_on);
+      
+      sprintf(ministr,"%7.5g",t);
+   
+      add_to_action(action,"cross interpolate ");
+      add_to_action(action,ministr);
+      
+   } else {
+   
+      /* alternate mode */
+      int got0, got1, used_parent;
+      char *trystr;
+
+      trystr = calloc(4 * (cp0->num_xforms + cp1->num_xforms), sizeof(char));
+
+      /* each xform comes from a random parent, possible for an entire parent to be excluded */
+      do {
+
+         trystr[0] = 0;
+         got0 = got1 = 0;
+         rb = flam3_random_isaac_bit(rc);
+         sprintf(ministr,"%d:",rb);
+         strcat(trystr,ministr);
+
+         /* Copy the parent, sorting the final xform to the end if it's present. */
+         if (rb)
+            flam3_copyx(out, cp1, cp1->num_xforms - (cp1->final_xform_index > 0), cp1->final_xform_enable);
+         else
+            flam3_copyx(out, cp0, cp0->num_xforms - (cp0->final_xform_index > 0), cp0->final_xform_enable);
+
+         used_parent = rb;
+
+         /* Only replace non-final xforms */
+
+         for (i = 0; i < out->num_xforms - out->final_xform_enable; i++) {
+            rb = flam3_random_isaac_bit(rc);
+
+            /* Replace xform if bit is 1 */
+            if (rb==1) {
+               if (used_parent==0) {
+                  if (i < cp1->num_xforms && cp1->xform[i].density > 0) {
+                     flam3_copy_xform(&out->xform[i],&cp1->xform[i]);
+                     sprintf(ministr," 1");
+                     got1 = 1;
+                  } else {
+                     sprintf(ministr," 0");
+                     got0 = 1;
+                  }
+               } else {
+                  if (i < cp0->num_xforms && cp0->xform[i].density > 0) {
+                     flam3_copy_xform(&out->xform[i],&cp0->xform[i]);
+                     sprintf(ministr," 0");
+                     got0 = 1;
+                  } else {
+                     sprintf(ministr," 1");
+                     got1 = 1;
+                  }
+               }
+            } else {
+               sprintf(ministr," %d",used_parent);
+               if (used_parent)
+                  got1 = 1;
+               else
+                  got0 = 1;
+            }
+
+            strcat(trystr,ministr);
+         }
+             
+         if (used_parent==0 && cp0->final_xform_enable)
+            got0 = 1;
+         else if (used_parent==1 && cp1->final_xform_enable)
+            got1 = 1;
+               
+      } while ((i > 1) && !(got0 && got1));
+
+      add_to_action(action,"cross alternate ");
+      add_to_action(action,trystr);
+      
+      free(trystr);
+   }
+   
+   /* reset color coords */
+   for (i = 0; i < out->num_xforms; i++) {
+      out->xform[i].color = i&1;
+   }
+               
+   /* Potentially genetically cross the two colormaps together */
+   if (flam3_random_isaac_01(rc) < 0.4) {
+                              
+      /* Select the starting parent */
+      int startParent=flam3_random_isaac_bit(rc);
+      int ci;
+                        
+      add_to_action(action," cmap_cross");
+      sprintf(ministr," %d:",startParent);
+      add_to_action(action,ministr);
+                  
+      /* Loop over the entries, switching to the other parent 1% of the time */
+      for (ci=0;ci<256;ci++) {
+         if (flam3_random_isaac_01(rc)<.01) {
+            startParent = 1-startParent;
+            sprintf(ministr," %d",ci);
+            add_to_action(action,ministr);
+         }
+                     
+         out->palette[ci] = startParent ? cp1->palette[ci]: cp0->palette[ci];
+      }
+   }
+
+}
+
+void flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, int sym, double speed, randctx *rc, char *action) {
 
    double randselect;
    flam3_genome mutation;
    int i,j,done;
-   char *mute_action;
-   
-   mute_action = calloc(256,sizeof(char));
+   char ministr[30];
    
    /* If mutate_mode = -1, choose a random mutation mode */
    if (mutate_mode == MUTATE_NOT_SPECIFIED) {
@@ -2365,10 +2553,10 @@ char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, i
    }
    
    memset(&mutation, 0, sizeof(flam3_genome));
-   
+      
    if (mutate_mode == MUTATE_ALL_VARIATIONS) {
    
-      sprintf(mute_action,"mutate all variations");
+      add_to_action(action,"mutate all variations");
 
       do {
          /* Create a random flame, and use the variations */
@@ -2400,7 +2588,9 @@ char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, i
       /* Which xform do we mutate? */
       modxf = ((unsigned)irand(rc)) % cp->num_xforms;
       
-      sprintf(mute_action,"mutate xform %d coefs",modxf);
+      add_to_action(action,"mutate xform ");
+      sprintf(ministr,"%d coefs",modxf);
+      add_to_action(action,ministr);
       
       /* if less than 3 xforms, then change only the translation part */
       if (2 >= cp->num_xforms) {
@@ -2414,7 +2604,7 @@ char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, i
       
    } else if (mutate_mode == MUTATE_ADD_SYMMETRY) {
    
-      sprintf(mute_action,"mutate symmetry");
+      add_to_action(action,"mutate symmetry");
       flam3_add_symmetry(cp, 0);
       
    } else if (mutate_mode == MUTATE_POST_XFORMS) {
@@ -2422,7 +2612,9 @@ char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, i
       int b = 1 + ((unsigned)irand(rc))%6;
       int same = ((unsigned)irand(rc))&3; /* 25% chance of using the same post for all of them */
       
-      sprintf(mute_action,"mutate post xforms %d %s",b, (same>0) ? "same" : "");
+      sprintf(ministr,"(%d%s)",b,(same>0) ? " same" : "");
+      add_to_action(action,"mutate post xforms ");
+      add_to_action(action,ministr);
       for (i = 0; i < cp->num_xforms; i++) {
          int copy = (i > 0) && same;
 
@@ -2507,23 +2699,25 @@ char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, i
       if (s < 0.4) { /* randomize xform color coords */
       
          flam3_improve_colors(cp, 100, 0, 10);
-         sprintf(mute_action,"mutate color coords");
+         add_to_action(action,"mutate color coords");
          
       } else if (s < 0.8) { /* randomize xform color coords and palette */
       
          flam3_improve_colors(cp, 25, 1, 10);
-         sprintf(mute_action,"mutate color all");
+         add_to_action(action,"mutate color all");
          
       } else { /* randomize palette only */
 
          cp->palette_index = flam3_get_palette(flam3_palette_random, cp->palette, cp->hue_rotation);
-         sprintf(mute_action,"mutate color palette");
+         add_to_action(action,"mutate color palette");
 
       }
    } else if (mutate_mode == MUTATE_DELETE_XFORM) {
    
       int nx = ((unsigned)irand(rc))%cp->num_xforms;
-      sprintf(mute_action,"mutate delete xform %d",nx);
+      sprintf(ministr,"%d",nx);
+      add_to_action(action,"mutate delete xform ");
+      add_to_action(action,ministr);
 
       if (cp->num_xforms > 1)
          flam3_delete_xform(cp,nx);
@@ -2531,7 +2725,7 @@ char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, i
    } else { /* MUTATE_ALL_COEFS */ 
    
       int x;
-      sprintf(mute_action,"mutate all coefs");
+      add_to_action(action,"mutate all coefs");
       flam3_random(&mutation, ivars, ivars_n, sym, cp->num_xforms);
 
       /* change all the coefs by a fraction of the random */
@@ -2548,11 +2742,7 @@ char *flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, i
    
    clear_cp(&mutation,flam3_defaults_on);
 
-   return(mute_action); /* Must free this in calling routine */
-   
 }
-   
-   
 
 static int random_var() {
   return random() % flam3_nvariations;
@@ -3343,19 +3533,18 @@ void bits_error(flam3_frame *spec) {
 }
 
 void flam3_render(flam3_frame *spec, void *out,
-        int out_width, int field, int nchan, int trans,
-        stat_struct *stats) {
+        int field, int nchan, int trans, stat_struct *stats) {
   if (spec->nthreads == 1) {
     /* single-threaded */
     switch (spec->bits) {
     case 32:
-      render_rectangle_int(spec, out, out_width, field, nchan, trans, stats);
+      render_rectangle_int(spec, out, field, nchan, trans, stats);
       break;
     case 33:
-      render_rectangle_float(spec, out, out_width, field, nchan, trans, stats);
+      render_rectangle_float(spec, out, field, nchan, trans, stats);
       break;
     case 64:
-      render_rectangle_double(spec, out, out_width, field, nchan, trans, stats);
+      render_rectangle_double(spec, out, field, nchan, trans, stats);
       break;
     default:
       bits_error(spec);
@@ -3365,13 +3554,13 @@ void flam3_render(flam3_frame *spec, void *out,
     /* multi-threaded */
     switch (spec->bits) {
     case 32:
-      render_rectangle_int_mt(spec, out, out_width, field, nchan, trans, stats);
+      render_rectangle_int_mt(spec, out, field, nchan, trans, stats);
       break;
     case 33:
-      render_rectangle_float_mt(spec, out, out_width, field, nchan, trans, stats);
+      render_rectangle_float_mt(spec, out, field, nchan, trans, stats);
       break;
     case 64:
-      render_rectangle_double_mt(spec, out, out_width, field, nchan, trans, stats);
+      render_rectangle_double_mt(spec, out, field, nchan, trans, stats);
       break;
     default:
       bits_error(spec);

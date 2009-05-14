@@ -318,16 +318,47 @@ void interpolate_catmull_rom(flam3_genome cps[], double t, flam3_genome *result)
    cmc[2] = (4*t2 - 3*t3 + t) / 2;
    cmc[3] = (t3 - t2) / 2;
 
-   flam3_interpolate_n(result, 4, cps, cmc);
+   flam3_interpolate_n(result, 4, cps, cmc, 0);
 }
+
+double smoother(double t) {
+  return 3*t*t - 2*t*t*t;
+}
+
+double get_stagger_coef(double t, double stagger_prc, int num_xforms, int this_xform) {
+
+   /* max_stag is the spacing between xform start times if stagger_prc = 1.0 */
+   double max_stag = (double)(num_xforms-1)/num_xforms;
+   
+   /* scale the spacing by stagger_prc */
+   double stag_scaled = stagger_prc * max_stag;
+
+   /* t ranges from 1 to 0 (the contribution of cp[0] to the blend) */
+   /* the first line below makes the first xform interpolate first */
+   /* the second line makes the last xform interpolate first */
+   double st = stag_scaled * (num_xforms - 1 - this_xform) / (num_xforms-1);
+//   double st = stag_scaled * (this_xform) / (num_xforms-1);
+   double et = st + (1-stag_scaled);
+   
+//   printf("t=%f xf:%d st=%f et=%f : : %f\n",t,this_xform,st,et,smoother((t-st)/(1-stag_scaled)));
+   
+   if (t <= st)
+      return (0);
+   else if (t >= et)
+      return (1);
+   else
+      return ( smoother((t-st)/(1-stag_scaled)) );
+
+}
+   
 
 
 /* all cpi and result must be aligned (have the same number of xforms,
    and have final xform in the same slot) */
 void flam3_interpolate_n(flam3_genome *result, int ncp,
-          flam3_genome *cpi, double *c) {
+          flam3_genome *cpi, double *c, double stagger) {
    int i, j, k, numstd;
-
+   
    if (flam3_palette_interpolation_hsv == cpi[0].palette_interpolation) {
    
       for (i = 0; i < 256; i++) {
@@ -417,8 +448,19 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
 
    /* Interpolate each xform */
    for (i = 0; i < cpi[0].num_xforms; i++) {
+   
+      double csave[2];     
       double td;
       int all_id;
+      
+      if (ncp==2 && stagger>0) { // && i!=cpi[0].final_xform_index) {
+         csave[0] = c[0];
+         csave[1] = c[1];
+         c[0] = get_stagger_coef(csave[0],stagger,cpi[0].num_xforms,i);
+         c[1] = 1.0-c[0];
+      }
+      
+      
       INTERP(xform[i].density);
       td = result->xform[i].density;
       result->xform[i].density = (td < 0.0) ? 0.0 : td;
@@ -573,7 +615,14 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
             result->xform[i].post[1][1] = 1.0;
          }
       }
+      
+      if (ncp==2 && stagger>0) {
+         c[0] = csave[0];
+         c[1] = csave[1];
+      }
+      
    }
+   
 }
 
 void establish_asymmetric_refangles(flam3_genome *cp, int ncps) {

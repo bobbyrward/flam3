@@ -229,14 +229,14 @@ int main(int argc, char **argv) {
 
     if (do_fields) {
     
-   flam3_render(&f, image, cps[0].width, flam3_field_even, channels, transparency,&stats);
+   flam3_render(&f, image, flam3_field_even, channels, transparency,&stats);
    f.time += 0.5;
-   flam3_render(&f, image, cps[0].width, flam3_field_odd, channels, transparency,&stats2);
+   flam3_render(&f, image, flam3_field_odd, channels, transparency,&stats2);
    stats.badvals+=stats2.badvals;
    stats.render_seconds+=stats2.render_seconds;
    stats.num_iters+=stats2.num_iters;
     } else {
-   flam3_render(&f, image, cps[0].width, flam3_field_both, channels, transparency,&stats);
+   flam3_render(&f, image, flam3_field_both, channels, transparency,&stats);
     }
 
     if (getenv("out"))
@@ -253,7 +253,7 @@ int main(int argc, char **argv) {
        sprintf(flamename,"%s.flam3",fname);
    
        /* get center genome */
-       flam3_interpolate(f.genomes, f.ngenomes, f.time, &center_cp);
+       flam3_interpolate(f.genomes, f.ngenomes, f.time, 0, &center_cp);
        
        /* write it out */
        genfp = fopen(flamename,"w");
@@ -274,7 +274,7 @@ int main(int argc, char **argv) {
     }
 
     /* Get center cp for embedding in png file */
-    flam3_interpolate(f.genomes, f.ngenomes, f.time, &center_cp);
+    flam3_interpolate(f.genomes, f.ngenomes, f.time, 0, &center_cp);
    
     /* Convert to string */
     fpc.genome = flam3_print_to_string(&center_cp);      

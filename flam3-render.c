@@ -329,7 +329,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "\n");
          }
          cps[i].ntemporal_samples = 1;
-         flam3_render(&f, strip_start, cps[i].width, flam3_field_both, channels, transparency, &stats);
+         flam3_render(&f, strip_start, flam3_field_both, channels, transparency, &stats);
 
          if (NULL != out) {
             strcpy(fname,out);
