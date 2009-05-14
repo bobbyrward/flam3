@@ -36,11 +36,14 @@ int flam3_atoi(char *nstr) {
    res = strtol(nstr, &endp, 10);
 
    /* Check errno & return string */
-   if (endp!=nstr+strlen(nstr))
+   if (endp!=nstr+strlen(nstr)) {
       flam3_conversion_failed = 1;
-   if (errno)
+      fprintf(stderr,"flam3_atoi : Error converting :%s: extra chars\n",nstr);
+   }
+   if (errno) {
       flam3_conversion_failed = 1;
-
+      fprintf(stderr,"flam3_atoi : Error converting :%s:\n",nstr);
+   }
    return(res);
 }
 
@@ -57,11 +60,14 @@ double flam3_atof(char *nstr) {
    res = strtod(nstr, &endp);
     
    /* Check errno & return string */
-   if (endp!=nstr+strlen(nstr))
+   if (endp!=nstr+strlen(nstr)) {
       flam3_conversion_failed = 1;
-   if (errno)
+      fprintf(stderr,"flam3_atof: Error converting :%s: extra chars\n",nstr);
+   }
+   if (errno) {
       flam3_conversion_failed = 1;
-
+      fprintf(stderr,"flam3_atof: Error converting :%s:\n",nstr);
+   }
    return(res);
 }
 
