@@ -382,8 +382,8 @@ static void rotate_by(double *p, double *center, double by) {
     p[1] = r[1] + center[1];
 }
 
-static double golden_bit() {
-  return flam3_random_bit()?0.38196:0.61804;
+static double golden_bit(randctx *rc) {
+  return flam3_random_isaac_bit(rc)?0.38196:0.61804;
 }
 
 int
@@ -861,6 +861,9 @@ main(argc, argv)
          int did_color;
 
          do {
+         
+            int random_mode=0;
+         
             if (verbose) fprintf(stderr, ".");
             did_color = 0;
             f.time = (double) 0.0;
@@ -902,18 +905,6 @@ main(argc, argv)
                if ( strstr(action,"mutate color") )
                   did_color = 1;
                   
-               if (flam3_random_isaac_bit(&f.rc)) {
-                  double bmin[2], bmax[2];
-                  flam3_estimate_bounding_box(&cp_orig, 0.01, 100000, bmin, bmax, &f.rc);
-                  cp_orig.center[0] = (bmin[0] + bmax[0]) / 2.0;
-                  cp_orig.center[1] = (bmin[1] + bmax[1]) / 2.0;
-                  cp_orig.rot_center[0] = cp_orig.center[0];
-                  cp_orig.rot_center[1] = cp_orig.center[1];
-                  cp_orig.pixels_per_unit = cp_orig.width / (bmax[0] - bmin[0]);
-                  add_to_action(action," reframed");
-                  
-               }
-
                if (cp_orig.flame_name[0]) {
                   char tm[flam3_name_len+1];
                   strncpy(tm, cp_orig.flame_name, flam3_name_len);
@@ -927,8 +918,8 @@ main(argc, argv)
                parent0 = string_to_cp(cross0, &parent0_n);
                parent1 = string_to_cp(cross1, &parent1_n);
 
-               i0 = random()%parent0_n;
-               i1 = random()%parent1_n;
+               i0 = ((unsigned)irand(&f.rc))%parent0_n;
+               i1 = ((unsigned)irand(&f.rc))%parent1_n;
 
                flam3_copy(&selp0, &(parent0[i0]));
                flam3_copy(&selp1, &(parent1[i1]));
@@ -958,41 +949,43 @@ main(argc, argv)
 
             } else {
                sprintf(action,"random");
+               random_mode=1;
                flam3_random(&cp_orig, ivars, num_ivars, sym, 0);
 
-               /* Adjust bounding box by default */
-               if (1) {
-                  double bmin[2], bmax[2];
-                  flam3_estimate_bounding_box(&cp_orig, 0.01, 100000, bmin, bmax, &f.rc);
-                  if (flam3_random01() < 0.3) {
-                     cp_orig.center[0] = (bmin[0] + bmax[0]) / 2.0;
-                     cp_orig.center[1] = (bmin[1] + bmax[1]) / 2.0;
-                     add_to_action(action," recentered");
-                  } else {
-                     double mix0, mix1;
-                     if (flam3_random_bit()) {
-                        mix0 = golden_bit() + flam3_random11()/5;
-                        mix1 = golden_bit();
-                        add_to_action(action," reframed0");
-                     } else if (flam3_random_bit()) {
-                        mix0 = golden_bit();
-                        mix1 = golden_bit() + flam3_random11()/5;
-                        add_to_action(action," reframed1");
-                     } else {
-                        mix0 = golden_bit() + flam3_random11()/5;
-                        mix1 = golden_bit() + flam3_random11()/5;
-                        add_to_action(action," reframed2");
-                     }
-                     cp_orig.center[0] = mix0 * bmin[0] + (1-mix0)*bmax[0];
-                     cp_orig.center[1] = mix1 * bmin[1] + (1-mix1)*bmax[1];
-                  }
-                  cp_orig.rot_center[0] = cp_orig.center[0];
-                  cp_orig.rot_center[1] = cp_orig.center[1];
-                  cp_orig.pixels_per_unit = cp_orig.width / (bmax[0] - bmin[0]);
-               }
 
                aselp0 = NULL;
                aselp1 = NULL;
+            }
+
+            /* Adjust bounding box half the time */
+            if (flam3_random_bit(&f.rc) || random_mode) {
+               double bmin[2], bmax[2];
+               flam3_estimate_bounding_box(&cp_orig, 0.01, 100000, bmin, bmax, &f.rc);
+               if (flam3_random_isaac_01(&f.rc) < 0.3) {
+                  cp_orig.center[0] = (bmin[0] + bmax[0]) / 2.0;
+                  cp_orig.center[1] = (bmin[1] + bmax[1]) / 2.0;
+                  add_to_action(action," recentered");
+               } else {
+                  double mix0, mix1;
+                  if (flam3_random_isaac_bit(&f.rc)) {
+                     mix0 = golden_bit(&f.rc) + flam3_random_isaac_11(&f.rc)/5;
+                     mix1 = golden_bit(&f.rc);
+                     add_to_action(action," reframed0");
+                  } else if (flam3_random_isaac_bit(&f.rc)) {
+                     mix0 = golden_bit(&f.rc);
+                     mix1 = golden_bit(&f.rc) + flam3_random_isaac_11(&f.rc)/5;
+                     add_to_action(action," reframed1");
+                  } else {
+                     mix0 = golden_bit(&f.rc) + flam3_random_isaac_11(&f.rc)/5;
+                     mix1 = golden_bit(&f.rc) + flam3_random_isaac_11(&f.rc)/5;
+                     add_to_action(action," reframed2");
+                  }
+                  cp_orig.center[0] = mix0 * bmin[0] + (1-mix0)*bmax[0];
+                  cp_orig.center[1] = mix1 * bmin[1] + (1-mix1)*bmax[1];
+               }
+               cp_orig.rot_center[0] = cp_orig.center[0];
+               cp_orig.rot_center[1] = cp_orig.center[1];
+               cp_orig.pixels_per_unit = cp_orig.width / (bmax[0] - bmin[0]);
             }
 
             truncate_variations(&cp_orig, 5, action);
