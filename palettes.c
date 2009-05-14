@@ -338,6 +338,8 @@ static double try_colors(flam3_genome *g, int color_resolution) {
     flam3_frame f;
     unsigned char *image, *p;
     flam3_genome saved;
+    double scalar;
+    int pixtotal;
     stat_struct stats;
 
     memset(&saved, 0, sizeof(flam3_genome));
@@ -347,9 +349,17 @@ static double try_colors(flam3_genome *g, int color_resolution) {
     g->sample_density = 1;
     g->spatial_oversample = 1;
     g->estimator = 0.0;
-    g->width = 100; // XXX keep aspect ratio
-    g->height = 100;
-    g->pixels_per_unit = 50;
+    
+    /* Scale the image so that the total number of pixels is ~10000 */
+    pixtotal = g->width * g->height;    
+    scalar = sqrt( 10000.0 / (double)pixtotal);
+    g->width *= scalar;
+    g->height *= scalar;
+    g->pixels_per_unit *= scalar;      
+    
+//    g->width = 100; // XXX keep aspect ratio
+//    g->height = 100;
+//    g->pixels_per_unit = 50;
     g->nbatches = 1;
     g->ntemporal_samples = 1;
 
@@ -426,6 +436,7 @@ static void change_colors(flam3_genome *g, int change_palette) {
    x0 = random_xform(g, -1);
    x1 = random_xform(g, x0);
    if (x0 >= 0 && (random()&1)) g->xform[x0].color = 0.0;
+   if (x1 >= 0 && (random()&1)) g->xform[x1].color = 1.0;
 }
 
 void flam3_improve_colors(flam3_genome *g, int ntries, int change_palette, int color_resolution) {
