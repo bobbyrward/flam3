@@ -925,6 +925,8 @@ void flam3_add_xforms(flam3_genome *thiscp, int num_to_add, int interp_padding, 
    flam3_xform tmp;
    
    oldstd = thiscp->num_xforms - (thiscp->final_xform_index >= 0);
+   
+   /* !!! must make sure that if final_flag is specified, we don't already have a final xform! !!! */
 
 //   if (thiscp->num_xforms > 0)
       thiscp->xform = (flam3_xform *)realloc(thiscp->xform, (thiscp->num_xforms + num_to_add) * sizeof(flam3_xform));

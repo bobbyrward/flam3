@@ -22,10 +22,14 @@
 #define badvalue(x) (((x)!=(x))||((x)>1e10)||((x)<-1e10))
 
 /* Wrap the sincos function for Macs */
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_MSC_VER)
 #define sincos(x,s,c) *(s)=sin(x); *(c)=cos(x);
 #else
 extern void sincos(double x, double *s, double *c);
+#endif
+
+#ifdef _MSC_VER
+#define trunc (int)
 #endif
 
 char *flam3_variation_names[1+flam3_nvariations] = {
