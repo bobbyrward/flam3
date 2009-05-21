@@ -1617,19 +1617,38 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
    }
 
    for (i = 0; i < 256; i++) {
-      double r, g, b;
+      double r, g, b, a;
       r = (cp->palette[i].color[0] * 255.0);
       g = (cp->palette[i].color[1] * 255.0);
       b = (cp->palette[i].color[2] * 255.0);
-      if (getenv("intpalette"))
-         fprintf(f, "   <color index=\"%d\" rgb=\"%d %d %d\"/>\n", i, (int)rint(r), (int)rint(g), (int)rint(b));
-      else {
+      a = (cp->palette[i].color[3] * 255.0);
+      
+      if (i%4 == 0)
+         fprintf(f, "   ");
+      
+      if (flam27_flag || a==255.0) {
+      
+         if (flam27_flag && a!=255.0)
+            fprintf(stderr,"alpha channel in palette cannot be stored in 2.7 compatibility mode; truncating\n");
+      
+         if (getenv("intpalette"))
+            fprintf(f, "<color index=\"%d\" rgb=\"%d %d %d\"/>", i, (int)rint(r), (int)rint(g), (int)rint(b));
+         else {
 #ifdef USE_FLOAT_INDICES
-         fprintf(f, "   <color index=\"%.10g\" rgb=\"%.6g %.6g %.6g\"/>\n", cp->palette[i].index, r, g, b);
+            fprintf(f, "<color index=\"%.10g\" rgb=\"%.6g %.6g %.6g\"/>", cp->palette[i].index, r, g, b);
 #else
-         fprintf(f, "   <color index=\"%d\" rgb=\"%.6g %.6g %.6g\"/>\n", i, r, g, b);
+            fprintf(f, "<color index=\"%d\" rgb=\"%.6g %.6g %.6g\"/>", i, r, g, b);
 #endif
+         }
+      } else {
+         if (getenv("intpalette"))
+            fprintf(f, "   <color index=\"%d\" rgba=\"%d %d %d %d\"/>", i, (int)rint(r), (int)rint(g), (int)rint(b), (int)rint(a));
+         else
+            fprintf(f, "   <color index=\"%d\" rgba=\"%.6g %.6g %.6g %.6g\"/>", i, r, g, b, a);
       }
+      if (i%4 == 3)
+         fprintf(f, "\n");
+         
    }
 
    if (cp->edits != NULL && print_edits==flam3_print_edits) {

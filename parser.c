@@ -84,9 +84,10 @@ int flam3_parse_hexformat_colors(char *colstr, flam3_genome *cp, int numcolors, 
 
    int c_idx=0;
    int col_count=0;
-   int r,g,b;
+   int r,g,b,a;
    int sscanf_ret;
    char tmps[2];
+   int skip = (int)fabs(chan);
    
    /* Strip whitespace prior to first color */
    while (isspace( (int)colstr[c_idx]))
@@ -95,17 +96,20 @@ int flam3_parse_hexformat_colors(char *colstr, flam3_genome *cp, int numcolors, 
    do {
 
       /* Parse an RGB triplet at a time... */
+      a = 255;
       if (chan==3)
          sscanf_ret = sscanf(&(colstr[c_idx]),"%2x%2x%2x",&r,&g,&b);
-      else
+      else if (chan==-4)
          sscanf_ret = sscanf(&(colstr[c_idx]),"00%2x%2x%2x",&r,&g,&b);
+      else // chan==4
+         sscanf_ret = sscanf(&(colstr[c_idx]),"%2x%2x%2x%2x",&r,&g,&b,&a);
 
-      if (sscanf_ret != 3) {
+      if ((chan!=4 && sscanf_ret != 3) || (chan==4 && sscanf_ret != 4)) {
          fprintf(stderr, "Error:  Problem reading hexadecimal color data.\n");
          return(1);
       }
 
-      c_idx += 2*chan;
+      c_idx += 2*skip;
 
       while (isspace( (int)colstr[c_idx]))
          c_idx++;
@@ -113,7 +117,7 @@ int flam3_parse_hexformat_colors(char *colstr, flam3_genome *cp, int numcolors, 
       cp->palette[col_count].color[0] = r / 255.0;
       cp->palette[col_count].color[1] = g / 255.0;
       cp->palette[col_count].color[2] = b / 255.0;
-      cp->palette[col_count].color[3] = 1.0;
+      cp->palette[col_count].color[3] = a / 255.0;
       cp->palette[col_count].index = col_count;
 
       col_count++;
@@ -394,7 +398,7 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
       /* Is this a color node? */
       if (!xmlStrcmp(chld_node->name, (const xmlChar *)"color")) {
          double index = -1;
-         double r=0.0,g=0.0,b=0.0;
+         double r=0.0,g=0.0,b=0.0,a=0.0;
 
          /* Loop through the attributes of the color element */
          att_ptr = chld_node->properties;
@@ -411,8 +415,15 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
             if (!xmlStrcmp(cur_att->name, (const xmlChar *)"index")) {
                index = flam3_atof(att_str);
             } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rgb")) {
+               a = 255.0;
                if (sscanf(att_str, "%lf %lf %lf%1s", &r, &g, &b, tmps) != 3) {
                   fprintf(stderr,"error: invalid rgb attribute '%s'\n",att_str);
+                  xmlFree(att_str);
+                  return(1);
+               }
+            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rgba")) {
+               if (sscanf(att_str, "%lf %lf %lf% %lf1s", &r, &g, &b, &a, tmps) != 4) {
+                  fprintf(stderr,"error: invalid rgba attribute '%s'\n",att_str);
                   xmlFree(att_str);
                   return(1);
                }
@@ -429,7 +440,7 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
             cp->palette[ix].color[0] = r / 255.0;
             cp->palette[ix].color[1] = g / 255.0;
             cp->palette[ix].color[2] = b / 255.0;
-            cp->palette[ix].color[3] = 1.0;
+            cp->palette[ix].color[3] = a / 255.0;
             cp->palette[ix].index = index;
             ix++;
          } else {
@@ -455,7 +466,7 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
             if (!xmlStrcmp(cur_att->name, (const xmlChar *)"count")) {
                count = flam3_atoi(att_str);
             } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"data")) {
-               if (flam3_parse_hexformat_colors(att_str, cp, count, 4) > 0) {
+               if (flam3_parse_hexformat_colors(att_str, cp, count, -4) > 0) {
                   fprintf(stderr,"error parsing hexformatted colors\n");
                   xmlFree(att_str);
                   return(1);
@@ -549,7 +560,6 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
             /* Read formatted string from contents of tag */
 
             pal_str = (char *) xmlNodeGetContent(chld_node);
-            /* !!! check hexform parse for errors */
 
             if (flam3_parse_hexformat_colors(pal_str, cp, numcolors, numbytes) > 0) {
                fprintf(stderr,"error reading hexformatted colors\n");
