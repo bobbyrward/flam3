@@ -412,18 +412,25 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
 
             att_str = (char *) xmlGetProp(chld_node,cur_att->name);
 
+            a = 255.0;
+
             if (!xmlStrcmp(cur_att->name, (const xmlChar *)"index")) {
                index = flam3_atof(att_str);
             } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rgb")) {
-               a = 255.0;
                if (sscanf(att_str, "%lf %lf %lf%1s", &r, &g, &b, tmps) != 3) {
                   fprintf(stderr,"error: invalid rgb attribute '%s'\n",att_str);
                   xmlFree(att_str);
                   return(1);
                }
             } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rgba")) {
-               if (sscanf(att_str, "%lf %lf %lf% %lf1s", &r, &g, &b, &a, tmps) != 4) {
+               if (sscanf(att_str, "%lf %lf %lf %lf%1s", &r, &g, &b, &a, tmps) != 4) {
                   fprintf(stderr,"error: invalid rgba attribute '%s'\n",att_str);
+                  xmlFree(att_str);
+                  return(1);
+               }
+            } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"a")) {
+               if (sscanf(att_str, "%lf%1s", &a, tmps) != 1) {
+                  fprintf(stderr,"error: invalid a attribute '%s'\n",att_str);
                   xmlFree(att_str);
                   return(1);
                }
