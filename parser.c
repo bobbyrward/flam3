@@ -444,10 +444,11 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
          }
 
          if (index >= 0 && index <= 255.0) {
-            cp->palette[ix].color[0] = r / 255.0;
-            cp->palette[ix].color[1] = g / 255.0;
-            cp->palette[ix].color[2] = b / 255.0;
             cp->palette[ix].color[3] = a / 255.0;
+            /* Don't forget to premultiply the palette... */
+            cp->palette[ix].color[0] = cp->palette[ix].color[3] * r / 255.0;
+            cp->palette[ix].color[1] = cp->palette[ix].color[3] * g / 255.0;
+            cp->palette[ix].color[2] = cp->palette[ix].color[3] * b / 255.0;
             cp->palette[ix].index = index;
             ix++;
          } else {
