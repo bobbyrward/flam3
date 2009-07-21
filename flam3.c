@@ -29,6 +29,7 @@
 #include "filters.h"
 #include "palettes.h"
 #include <limits.h>
+#include <locale.h>
 #include <math.h>
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
@@ -270,7 +271,7 @@ void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, in
    
    /* Loop over the grid */
    for (xx=-numvals;xx<=numvals;xx++) {
-      for (yy=-numvals;yy<=numvals;yy++) {
+      for (yy=numvals;yy>=-numvals;yy--) {
       
          /* Calculate the input coordinates */
          p[0] = (double)xx * incr;
@@ -373,6 +374,7 @@ flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag, double sta
    flam3_genome prealign[2];
    flam3_genome *result;
    int i,si;
+   char *ai;
 
    memset(spun, 0, 2*sizeof(flam3_genome));
    memset(prealign, 0, 2*sizeof(flam3_genome));
@@ -416,7 +418,11 @@ flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag, double sta
       flam3_rotate(&spun[1], blend*360.0, spun[0].interpolation_type);
 
       /* Now call the interpolation */
-      flam3_interpolate(spun, 2, smoother(blend), stagger, result);
+      if (argi("unsmoother",0) == 0)
+         flam3_interpolate(spun, 2, smoother(blend), stagger, result);
+      else
+         flam3_interpolate(spun, 2, blend, stagger, result);
+      
 
      /* Interpolation type no longer needs to be forced to linear mode */
 //     if (!seqflag)
@@ -1328,11 +1334,34 @@ flam3_genome *flam3_parse_xml2(char *xmldata, char *xmlfilename, int default_fla
    /* What is the root node of the document? */
    rootnode = xmlDocGetRootElement(doc);
 
+   
+   // force use of "C" locale when writing reals.
+   // first save away the current settings.
+   char* locale = NULL;
+   char* lorig  = setlocale(LC_NUMERIC, NULL);
+   if (lorig == NULL)
+      fprintf(stderr, "error: couldn't get current locale\n");
+   else {
+      int slen = strlen(lorig) + 1;
+      locale = (char*)malloc(slen);
+      if (locale != NULL)
+         memcpy(locale, lorig, slen);
+   }
+   if (setlocale(LC_NUMERIC, "C") == NULL)
+      fprintf(stderr, "error: couldn't set C locale\n");
+
    /* Scan for <flame> nodes, starting with this node */
    bn = basename(xmlfilename);
-   
+
    /* Have to use &loc_all_cp since the memory gets allocated in scan_for_flame_nodes */
    scan_for_flame_nodes(rootnode, bn, default_flag,&loc_all_cp,&loc_all_ncps);
+
+   // restore locale
+   if (locale != NULL) {
+      if (setlocale(LC_NUMERIC, locale) == NULL)
+         fprintf(stderr, "error: couldn't replace locale settings\n");
+      free(locale);
+   }
    
    xmlFreeDoc(doc);
 
@@ -1500,6 +1529,22 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
    int i,numstd;
    int flam27_flag;
    char *ai;
+
+   // force use of "C" locale when writing reals.
+   // first save away the current settings.
+   char* locale = NULL;
+   char* lorig  = setlocale(LC_NUMERIC, NULL);
+   if (lorig == NULL)
+      fprintf(stderr, "error: couldn't get current locale\n");
+   else {
+      int slen = strlen(lorig) + 1;
+      locale = (char*)malloc(slen);
+      if (locale != NULL)
+      memcpy(locale, lorig, slen);
+   }
+   if (setlocale(LC_NUMERIC, "C") == NULL)
+      fprintf(stderr, "error: couldn't set C locale\n");
+
    
    flam27_flag = argi("flam27",0);
 
@@ -1660,6 +1705,11 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
    }
    fprintf(f, "</flame>\n");
 
+   if (locale != NULL) {
+      if (setlocale(LC_NUMERIC, locale) == NULL)
+         fprintf(stderr, "error: couldn't restore locale settings\n");
+      free(locale);
+   }
 }
 
 #define PRINTNON(p) do { if (x->p != 0.0) fprintf(f, #p "=\"%f\" ",x->p); } while(0)
