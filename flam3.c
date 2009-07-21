@@ -271,7 +271,7 @@ void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, in
    
    /* Loop over the grid */
    for (xx=-numvals;xx<=numvals;xx++) {
-      for (yy=numvals;yy>=-numvals;yy--) {
+      for (yy=-numvals;yy<=numvals;yy++) {
       
          /* Calculate the input coordinates */
          p[0] = (double)xx * incr;
