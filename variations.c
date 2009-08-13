@@ -705,7 +705,7 @@ void var29_cylinder (void *helper, double weight) {
 void var30_perspective (void *helper, double weight) {
    /* perspective (01/06) */
    flam3_iter_helper *f = (flam3_iter_helper *)helper;
-   double t = 1.0 / (f->xform->perspective_dist - f->ty * f->xform->persp_vsin + EPS);
+   double t = 1.0 / (f->xform->perspective_dist - f->ty * f->xform->persp_vsin);
 
    f->p0 += weight * f->xform->perspective_dist * f->tx * t;
    f->p1 += weight * f->xform->persp_vfcos * f->ty * t;
