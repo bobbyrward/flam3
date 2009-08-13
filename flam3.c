@@ -1413,7 +1413,7 @@ flam3_genome *flam3_parse_xml2(char *xmldata, char *xmlfilename, int default_fla
 
 flam3_genome * flam3_parse_from_file(FILE *f, char *fname, int default_flag, int *ncps) {
    int i, c, slen = 5000;
-   char *s;
+   char *s, *snew;
    flam3_genome *ret;
 
    /* Incrementally read XML file into a string */
@@ -1426,7 +1426,13 @@ flam3_genome * flam3_parse_from_file(FILE *f, char *fname, int default_flag, int
       s[i++] = c;
       if (i == slen-1) {
          slen *= 2;
-         s = realloc(s, slen);
+         snew = realloc(s, slen);
+         if (snew==NULL) {
+            fprintf(stderr,"XML file too large to be read - aborting.\n");
+            free(s);
+            exit(1);
+         } else
+            s = snew;
       }
    } while (1);
 
