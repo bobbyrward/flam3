@@ -442,7 +442,8 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
       for (j=0;j<numstd;j++) {
          INTERP(chaos[i][j]);
          if (result->chaos[i][j]<0) result->chaos[i][j]=0;
-         if (result->chaos[i][j]>1) result->chaos[i][j]=1.0;
+         //chaos can be > 1
+         //if (result->chaos[i][j]>1) result->chaos[i][j]=1.0;
       }
    }
 

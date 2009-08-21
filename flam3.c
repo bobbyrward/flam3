@@ -114,7 +114,7 @@ int flam3_check_unity_chaos(flam3_genome *cp) {
    
    for (i=0;i<num_std;i++) {
       for (j=0;j<num_std;j++) {
-         if (cp->chaos[i][j] < 1.0)
+         if (cp->chaos[i][j] != 1.0)
             unity=0;
       }
    }
