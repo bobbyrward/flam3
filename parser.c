@@ -633,6 +633,11 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
 
             /* Add one to the counter */
             flam3_add_xforms(cp, 1, 0, 0);
+            
+            /* If there was already a final xform, we have to change xf to point to the second to last xform */
+            if (cp->final_xform_index>=0)
+               xf--;
+               
             cp->xform[xf].var[0]=0.0;
             num_std_xforms++;
                      
@@ -669,8 +674,7 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
                
             }
             
-         }
-            
+         }           
 
       } else if (!xmlStrcmp(chld_node->name, (const xmlChar *)"edit")) {
 
