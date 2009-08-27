@@ -70,7 +70,7 @@ char *flam3_version() {
 #define random_distrib(v) ((v)[random()%vlen(v)])
                                    
                                     
-unsigned short * flam3_create_xform_distrib(flam3_genome *cp) {
+unsigned short *flam3_create_xform_distrib(flam3_genome *cp) {
 
    /* Xform distrib is created in this function             */   
    int numrows;
@@ -97,7 +97,10 @@ unsigned short * flam3_create_xform_distrib(flam3_genome *cp) {
          else
             dist_row++;
          
-         flam3_create_chaos_distrib(cp, i, &(xform_distrib[CHOOSE_XFORM_GRAIN*(dist_row)]));
+         if (flam3_create_chaos_distrib(cp, i, &(xform_distrib[CHOOSE_XFORM_GRAIN*(dist_row)]))) {
+            free(xform_distrib);
+            return(NULL);
+         }
       }
    }
    
@@ -122,7 +125,7 @@ int flam3_check_unity_chaos(flam3_genome *cp) {
    return(unity);
 }
 
-void flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_distrib) {
+int flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_distrib) {
 
    /* Xform distrib is a preallocated array of CHOOSE_XFORM_GRAIN chars */
    /* address of array is passed in, contents are modified              */
@@ -144,7 +147,7 @@ void flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_
       //fprintf(stdout,"%f ",d);
       if (d < 0.0) {
          fprintf(stderr, "xform weight must be non-negative, not %g.\n", d);
-         exit(1);
+         return(1);
       }         
       
       dr += d;
@@ -154,7 +157,7 @@ void flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_
    
    if (dr == 0.0) {
       fprintf(stderr, "cannot iterate empty flame.\n");
-      exit(1);
+      return(1);
    }
    
    dr = dr / CHOOSE_XFORM_GRAIN;
@@ -289,7 +292,7 @@ void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, in
    }
 }         
 
-void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
+int flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
 
   int lp,plp;
   int mycolor;
@@ -316,6 +319,8 @@ void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
     // get into the attractor
     prepare_xform_fn_ptrs(cp,&rc);
     xform_distrib = flam3_create_xform_distrib(cp);
+    if (xform_distrib==NULL)
+       return(1);
     flam3_iterate(cp, SUB_BATCH_SIZE, 20, sub_batch, xform_distrib, &rc);
     free(xform_distrib);
     
@@ -328,6 +333,7 @@ void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
       hist[mycolor] += 1;
     }
   }
+  return(0);
 } 
   
 flam3_genome *sheep_loop(flam3_genome *cp, double blend) {
@@ -3302,7 +3308,7 @@ void flam3_free(void *ptr) {
  * find a 2d bounding box that does not enclose eps of the fractal density
  * in each compass direction.
  */
-void flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
+int flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
              double *bmin, double *bmax, randctx *rc) {
    int i;
    int low_target, high_target;
@@ -3322,6 +3328,8 @@ void flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
 
    prepare_xform_fn_ptrs(cp,rc);
    xform_distrib = flam3_create_xform_distrib(cp);
+   if (xform_distrib==NULL)
+      return(1);
    flam3_iterate(cp, nsamples, 20, points, xform_distrib, rc);
    free(xform_distrib);
 
@@ -3342,7 +3350,7 @@ void flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
       bmax[0] = max[0];
       bmax[1] = max[1];
       free(points);
-      return;
+      return(0);
    }
 
    qsort(points, nsamples, sizeof(double) * 4, sort_by_x);
@@ -3353,6 +3361,8 @@ void flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
    bmin[1] = points[4 * low_target + 1];
    bmax[1] = points[4 * high_target + 1];
    free(points);
+   
+   return(0);
 }
 
 
@@ -3606,42 +3616,44 @@ double flam3_render_memory_required(flam3_frame *spec)
 void bits_error(flam3_frame *spec) {
       fprintf(stderr, "flam3: bits must be 32, 33, or 64 not %d.\n",
          spec->bits);
-      exit(1);
 }
 
-void flam3_render(flam3_frame *spec, void *out,
+int flam3_render(flam3_frame *spec, void *out,
         int field, int nchan, int trans, stat_struct *stats) {
+         
+  int retval;
+  
   if (spec->nthreads == 1) {
     /* single-threaded */
     switch (spec->bits) {
     case 32:
-      render_rectangle_int(spec, out, field, nchan, trans, stats);
-      break;
+      retval = render_rectangle_int(spec, out, field, nchan, trans, stats);
+      return(retval);
     case 33:
-      render_rectangle_float(spec, out, field, nchan, trans, stats);
-      break;
+      retval = render_rectangle_float(spec, out, field, nchan, trans, stats);
+      return(retval);
     case 64:
-      render_rectangle_double(spec, out, field, nchan, trans, stats);
-      break;
+      retval = render_rectangle_double(spec, out, field, nchan, trans, stats);
+      return(retval);
     default:
       bits_error(spec);
-      break;
+      return(1);
     }
   } else {
     /* multi-threaded */
     switch (spec->bits) {
     case 32:
-      render_rectangle_int_mt(spec, out, field, nchan, trans, stats);
-      break;
+      retval = render_rectangle_int_mt(spec, out, field, nchan, trans, stats);
+      return(retval);
     case 33:
-      render_rectangle_float_mt(spec, out, field, nchan, trans, stats);
-      break;
+      retval = render_rectangle_float_mt(spec, out, field, nchan, trans, stats);
+      return(retval);
     case 64:
-      render_rectangle_double_mt(spec, out, field, nchan, trans, stats);
-      break;
+      retval = render_rectangle_double_mt(spec, out, field, nchan, trans, stats);
+      return(retval);
     default:
       bits_error(spec);
-      break;
+      return(1);
     }
   }
 }
@@ -3693,7 +3705,9 @@ double flam3_dimension(flam3_genome *cp, int ntries, int clip_to_camera) {
     bmax[0] = corner0 + cp->width  / ppux;
     bmax[1] = corner1 + cp->height / ppux;
   } else {
-    flam3_estimate_bounding_box(cp, 0.0, 0, bmin, bmax, &rc);
+    if (flam3_estimate_bounding_box(cp, 0.0, 0, bmin, bmax, &rc))
+       return(-1.0);
+       
   }
 
   d2max =
@@ -3717,6 +3731,8 @@ double flam3_dimension(flam3_genome *cp, int ntries, int clip_to_camera) {
     subb[3] = 0.0;
     prepare_xform_fn_ptrs(cp,&rc);
     xform_distrib = flam3_create_xform_distrib(cp);
+    if (xform_distrib==NULL)
+      return(-1.0);
     flam3_iterate(cp, SUB_BATCH_SIZE, 20, subb, xform_distrib, &rc);
     free(xform_distrib);
     i4 = 0;
@@ -3809,6 +3825,9 @@ double flam3_lyapunov(flam3_genome *cp, int ntries) {
     // get into the attractor
     prepare_xform_fn_ptrs(cp,&rc);
     xform_distrib = flam3_create_xform_distrib(cp);
+    if (xform_distrib==NULL)
+      return(-1.0);
+      
     flam3_iterate(cp, 1, 20+(random()%10), p, xform_distrib, &rc);
     free(xform_distrib);
 
@@ -3820,6 +3839,9 @@ double flam3_lyapunov(flam3_genome *cp, int ntries) {
 
     prepare_xform_fn_ptrs(cp,&rc);
     xform_distrib = flam3_create_xform_distrib(cp);
+    if (xform_distrib==NULL)
+      return(-1.0);
+
     flam3_iterate(cp, 1, 0, p, xform_distrib, &rc);
     free(xform_distrib);
 
@@ -3845,6 +3867,9 @@ double flam3_lyapunov(flam3_genome *cp, int ntries) {
     srandom(i);
     prepare_xform_fn_ptrs(cp,&rc);
     xform_distrib = flam3_create_xform_distrib(cp);
+    if (xform_distrib==NULL)
+      return(-1.0);
+
     flam3_iterate(cp, 1, 0, p, xform_distrib, &rc);
     free(xform_distrib);
 

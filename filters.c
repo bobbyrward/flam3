@@ -199,10 +199,6 @@ double flam3_spatial_filter(int knum, double x) {
       return flam3_lanczos2_filter(x)*flam3_sinc(x/2.0);
    else if (knum==13)
       return flam3_quadratic_filter(x);
-   else {
-      fprintf(stderr,"Unknown filter kernel %d!\n",knum);
-      exit(1);
-   }
 }
 
 int normalize_vector(double *v, int n) {
@@ -267,7 +263,7 @@ int flam3_create_spatial_filter(flam3_frame *spec, int field, double **filter) {
 
    if (normalize_vector((*filter), fwidth * fwidth)) {
       fprintf(stderr, "Spatial filter value is too small: %g.  Terminating.\n",sf_radius);
-      exit(1);
+      return(-1);
    }   
    
    return (fwidth);
@@ -283,15 +279,17 @@ flam3_de_helper flam3_create_de_filters(double max_rad, double min_rad, double c
    int filtloop;
    int keep_thresh=100;
 
+   de.kernel_size=-1;
+
    if (curve <= 0.0) {
       fprintf(stderr,"estimator curve must be > 0\n");
-      exit(1);
+      return(de);
    }
 
    if (max_rad < min_rad) {
       fprintf(stderr,"estimator must be larger than estimator_minimum.\n");
       fprintf(stderr,"(%f > %f) ? \n",max_rad,min_rad);
-      exit(1);
+      return(de);
    }
 
    /* We should scale the filter width by the oversample          */

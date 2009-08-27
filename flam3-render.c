@@ -329,7 +329,10 @@ int main(int argc, char **argv) {
             fprintf(stderr, "\n");
          }
          cps[i].ntemporal_samples = 1;
-         flam3_render(&f, strip_start, flam3_field_both, channels, transparency, &stats);
+         if (flam3_render(&f, strip_start, flam3_field_both, channels, transparency, &stats)) {
+            fprintf(stderr,"error rendering image: aborting.\n");
+            exit(1);
+         }
 
          if (NULL != out) {
             strcpy(fname,out);

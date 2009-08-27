@@ -456,7 +456,7 @@ static void iter_thread(void *fth) {
    #endif
 }
 
-static void render_rectangle(flam3_frame *spec, void *out,
+static int render_rectangle(flam3_frame *spec, void *out,
 			     int field, int nchan, int transp, stat_struct *stats) {
    long nbuckets;
    int i, j, k, batch_num, temporal_sample_num;
@@ -510,12 +510,12 @@ static void render_rectangle(flam3_frame *spec, void *out,
 
    if (nbatches < 1) {
        fprintf(stderr, "nbatches must be positive, not %d.\n", nbatches);
-       exit(1);
+       return(1);
    }
 
    if (oversample < 1) {
        fprintf(stderr, "oversample must be positive, not %d.\n", oversample);
-       exit(1);
+       return(1);
    }
 
    /* Initialize the thread helper structures */
@@ -539,6 +539,11 @@ static void render_rectangle(flam3_frame *spec, void *out,
 
    /* Spatial Filter kernel creation */
    filter_width = flam3_create_spatial_filter(spec, field, &filter);
+   
+   /* handle error */
+   if (filter_width<0)
+      return(1);
+      
    /* note we must free 'filter' at the end */
 
    /* batch filter */
@@ -598,7 +603,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
    if (NULL == last_block) {
       fprintf(stderr, "render_rectangle: cannot malloc %g bytes.\n", (double)memory_rqd);
       fprintf(stderr, "render_rectangle: w=%d h=%d nb=%ld.\n", fic.width, fic.height, nbuckets);
-      exit(1);
+      return(1);
    }
 
    /* Just free buckets at the end */   
@@ -635,7 +640,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
       /* filter kernels.  Check boundary conditions as well.           */
       if (cp.estimator < 0.0 || cp.estimator_minimum < 0.0) {
          fprintf(stderr,"density estimator filter widths must be >= 0\n");
-         exit(1);
+         return(1);
       }
 
       if (spec->bits <= 32) {
@@ -649,6 +654,9 @@ static void render_rectangle(flam3_frame *spec, void *out,
       if (cp.estimator > 0.0) {
          de = flam3_create_de_filters(cp.estimator,cp.estimator_minimum,
                                       cp.estimator_curve,oversample);
+         if (de.kernel_size<0) {
+            return(1);
+         }
       } else
          de.max_filter_index = 0;
       
@@ -667,6 +675,8 @@ static void render_rectangle(flam3_frame *spec, void *out,
          /* Get the xforms ready to render */
          prepare_xform_fn_ptrs(&cp, &spec->rc);
          xform_distrib = flam3_create_xform_distrib(&cp);
+         if (xform_distrib==NULL)
+            return(1);
 
          /* compute the colormap entries.                             */
          /* the input colormap is 256 long with entries from 0 to 1.0 */
@@ -685,7 +695,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
               fprintf(stderr,
                  "sample density (quality) must be greater than zero,"
                  " not %g.\n", cp.sample_density);
-              exit(1);
+              return(1);
             }
 
             scale = pow(2.0, cp.zoom);
@@ -1167,5 +1177,7 @@ static void render_rectangle(flam3_frame *spec, void *out,
 
    tend = time(NULL);
    stats->render_seconds = (int)(tend-tstart);
+   
+   return(0);
 
 }

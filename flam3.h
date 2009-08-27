@@ -510,7 +510,7 @@ void flam3_delete_motion_elements(flam3_xform *xf);
 
 EXPORT void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc);
 EXPORT unsigned short* flam3_create_xform_distrib(flam3_genome *cp);
-void flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_distrib);
+int flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_distrib);
 int flam3_check_unity_chaos(flam3_genome *cp);
 void clear_cp(flam3_genome *cp, int def_flag);
 
@@ -551,8 +551,8 @@ flam3_genome *flam3_parse_from_file(FILE *f, char *fn, int default_flag, int *nc
 void flam3_add_symmetry(flam3_genome *g, int sym);
 
 void flam3_improve_colors(flam3_genome *g, int ntries, int change_palette, int color_resolution);
-EXPORT void flam3_colorhist(flam3_genome *cp, int num_batches, double *hist);
-void flam3_estimate_bounding_box(flam3_genome *g, double eps, int nsamples,
+EXPORT int flam3_colorhist(flam3_genome *cp, int num_batches, double *hist);
+int flam3_estimate_bounding_box(flam3_genome *g, double eps, int nsamples,
              double *bmin, double *bmax, randctx *rc);
 void flam3_rotate(flam3_genome *g, double angle, int interp_type); /* angle in degrees */
 
@@ -586,7 +586,7 @@ typedef struct {
 
 /* out is pixel array.
    pixels are rgb or rgba if nchan is 3 or 4. */
-EXPORT void flam3_render(flam3_frame *f, void *out, int field, int nchan, int transp, stat_struct *stats);
+EXPORT int flam3_render(flam3_frame *f, void *out, int field, int nchan, int transp, stat_struct *stats);
 
 EXPORT double flam3_render_memory_required(flam3_frame *f);
 

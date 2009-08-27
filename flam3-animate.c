@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
   char badval_string[64];
   char numiter_string[64];
   char rtime_string[64];
-
+  
 #ifdef WIN32
    
   char *slashloc;
@@ -229,14 +229,24 @@ int main(int argc, char **argv) {
 
     if (do_fields) {
     
-   flam3_render(&f, image, flam3_field_even, channels, transparency,&stats);
+   if (flam3_render(&f, image, flam3_field_even, channels, transparency,&stats)) {
+      fprintf(stderr,"error rendering image: aborting.\n");
+      exit(1);
+   }
    f.time += 0.5;
-   flam3_render(&f, image, flam3_field_odd, channels, transparency,&stats2);
+   if (flam3_render(&f, image, flam3_field_odd, channels, transparency,&stats2)) {
+      fprintf(stderr,"error rendering image: aborting.\n");
+      exit(1);
+   }
+
    stats.badvals+=stats2.badvals;
    stats.render_seconds+=stats2.render_seconds;
    stats.num_iters+=stats2.num_iters;
     } else {
-   flam3_render(&f, image, flam3_field_both, channels, transparency,&stats);
+   if (flam3_render(&f, image, flam3_field_both, channels, transparency,&stats)) {
+      fprintf(stderr,"error rendering image: aborting.\n");
+      exit(1);
+   }
     }
 
     if (getenv("out"))

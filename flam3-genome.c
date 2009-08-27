@@ -1002,7 +1002,10 @@ main(argc, argv)
             cp_orig.edits = create_new_editdoc(action, aselp0, aselp1);
             flam3_copy(&cp_save, &cp_orig);
             test_cp(&cp_orig);
-            flam3_render(&f, image, flam3_field_both, 3, 0, &stats);
+            if (flam3_render(&f, image, flam3_field_both, 3, 0, &stats)) { 
+               fprintf(stderr,"error rendering test image: aborting.\n");
+               exit(1);
+            }
 
             if (1) {
                int n, tot, totb, totw;
