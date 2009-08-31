@@ -508,7 +508,7 @@ void flam3_copyx(flam3_genome *dest, flam3_genome *src, int num_std, int num_fin
 void flam3_copy_params(flam3_xform *dest, flam3_xform *src, int varn);
 void flam3_delete_motion_elements(flam3_xform *xf);
 
-EXPORT void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc);
+EXPORT int flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc);
 EXPORT unsigned short* flam3_create_xform_distrib(flam3_genome *cp);
 int flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_distrib);
 int flam3_check_unity_chaos(flam3_genome *cp);

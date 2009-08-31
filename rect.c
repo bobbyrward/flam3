@@ -673,7 +673,8 @@ static int render_rectangle(flam3_frame *spec, void *out,
          flam3_interpolate(spec->genomes, spec->ngenomes, temporal_sample_time, 0, &cp);
 
          /* Get the xforms ready to render */
-         prepare_xform_fn_ptrs(&cp, &spec->rc);
+         if (prepare_xform_fn_ptrs(&cp, &spec->rc))
+            return(1);
          xform_distrib = flam3_create_xform_distrib(&cp);
          if (xform_distrib==NULL)
             return(1);

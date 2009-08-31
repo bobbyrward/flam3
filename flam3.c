@@ -252,7 +252,7 @@ int flam3_iterate(flam3_genome *cp, int n, int fuse,  double *samples, unsigned 
    return(badvals);
 }
 
-void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc) {
+int flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc) {
 
    /* We will evaluate the 'xi'th xform 'depth' times, over the following values:           */
    /* x in [-range : range], y in [-range : range], with 2* (2*numvals+1)^2 values returned */ 
@@ -262,7 +262,8 @@ void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, in
    int xx,yy,dd;
    
    /* Prepare the function pointers */
-   prepare_xform_fn_ptrs(cp,rc);
+   if (prepare_xform_fn_ptrs(cp,rc))
+      return(1);
    
    /* Calculate increment */
    incr = range / (double)numvals;
@@ -290,6 +291,7 @@ void flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, in
          outi += 2;
       }
    }
+   return(0);
 }         
 
 int flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
@@ -317,8 +319,11 @@ int flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
     sub_batch[3] = 0;
 
     // get into the attractor
-    prepare_xform_fn_ptrs(cp,&rc);
+    if (prepare_xform_fn_ptrs(cp,&rc))
+       return(1);
+      
     xform_distrib = flam3_create_xform_distrib(cp);
+    
     if (xform_distrib==NULL)
        return(1);
     flam3_iterate(cp, SUB_BATCH_SIZE, 20, sub_batch, xform_distrib, &rc);
@@ -3326,7 +3331,8 @@ int flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
    points[2] = 0.0;
    points[3] = 0.0;
 
-   prepare_xform_fn_ptrs(cp,rc);
+   if (prepare_xform_fn_ptrs(cp,rc))
+      return(1);
    xform_distrib = flam3_create_xform_distrib(cp);
    if (xform_distrib==NULL)
       return(1);
@@ -3729,7 +3735,8 @@ double flam3_dimension(flam3_genome *cp, int ntries, int clip_to_camera) {
     subb[1] = flam3_random_isaac_11(&rc);
     subb[2] = 0.0;
     subb[3] = 0.0;
-    prepare_xform_fn_ptrs(cp,&rc);
+    if (prepare_xform_fn_ptrs(cp,&rc))
+      return(-1.0);
     xform_distrib = flam3_create_xform_distrib(cp);
     if (xform_distrib==NULL)
       return(-1.0);
@@ -3823,7 +3830,8 @@ double flam3_lyapunov(flam3_genome *cp, int ntries) {
     p[3] = 0.0;
 
     // get into the attractor
-    prepare_xform_fn_ptrs(cp,&rc);
+    if (prepare_xform_fn_ptrs(cp,&rc))
+      return(-1.0);
     xform_distrib = flam3_create_xform_distrib(cp);
     if (xform_distrib==NULL)
       return(-1.0);
@@ -3837,7 +3845,8 @@ double flam3_lyapunov(flam3_genome *cp, int ntries) {
     // take one deterministic step
     srandom(i);
 
-    prepare_xform_fn_ptrs(cp,&rc);
+    if (prepare_xform_fn_ptrs(cp,&rc))
+      return(-1.0);
     xform_distrib = flam3_create_xform_distrib(cp);
     if (xform_distrib==NULL)
       return(-1.0);
@@ -3865,7 +3874,8 @@ double flam3_lyapunov(flam3_genome *cp, int ntries) {
 
     // take the same step but with eps
     srandom(i);
-    prepare_xform_fn_ptrs(cp,&rc);
+    if (prepare_xform_fn_ptrs(cp,&rc))
+      return(-1.0);
     xform_distrib = flam3_create_xform_distrib(cp);
     if (xform_distrib==NULL)
       return(-1.0);

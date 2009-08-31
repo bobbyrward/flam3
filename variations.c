@@ -1895,7 +1895,7 @@ void xform_precalc(flam3_genome *cp, int xi) {
    wedgeJulia_precalc(&(cp->xform[xi]));   
 }   
 
-void prepare_xform_fn_ptrs(flam3_genome *cp, randctx *rc) {
+int prepare_xform_fn_ptrs(flam3_genome *cp, randctx *rc) {
 
    double d;
    int i,j,totnum;
@@ -1905,7 +1905,7 @@ void prepare_xform_fn_ptrs(flam3_genome *cp, randctx *rc) {
       d = cp->xform[i].density;
       if (d < 0.0) {
          fprintf(stderr, "xform %d weight must be non-negative, not %g.\n",i,d);
-         exit(1);
+         return(1);
       }
 
       if (i != cp->final_xform_index && d == 0.0)
@@ -1999,6 +1999,8 @@ void prepare_xform_fn_ptrs(flam3_genome *cp, randctx *rc) {
       cp->xform[i].num_active_vars = totnum;
 
    }
+   
+   return(0);
 }
 
 

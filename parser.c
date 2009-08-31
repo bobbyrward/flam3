@@ -587,7 +587,7 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
 
          if (att_ptr==NULL) {
             fprintf(stderr,"Error:  No attributes for symmetry element.\n");
-            exit(1);
+            return(1);
          }
 
          for (cur_att=att_ptr; cur_att; cur_att = cur_att->next) {
