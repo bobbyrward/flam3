@@ -117,7 +117,7 @@ int flam3_check_unity_chaos(flam3_genome *cp) {
    
    for (i=0;i<num_std;i++) {
       for (j=0;j<num_std;j++) {
-         if (cp->chaos[i][j] != 1.0)
+         if ( fabs(cp->chaos[i][j]-1.0) > EPS)
             unity=0;
       }
    }
@@ -182,6 +182,8 @@ int flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_d
       r += dr;
    }
    //fprintf(stdout,"\n---\n");
+   
+   return(0);
 }
 /*
  * run the function system described by CP forward N generations.  store

@@ -541,8 +541,10 @@ static int render_rectangle(flam3_frame *spec, void *out,
    filter_width = flam3_create_spatial_filter(spec, field, &filter);
    
    /* handle error */
-   if (filter_width<0)
+   if (filter_width<0) {
+      fprintf(stderr,"flam3_create_spatial_filter returned error: aborting\n");
       return(1);
+   }
       
    /* note we must free 'filter' at the end */
 
@@ -655,6 +657,7 @@ static int render_rectangle(flam3_frame *spec, void *out,
          de = flam3_create_de_filters(cp.estimator,cp.estimator_minimum,
                                       cp.estimator_curve,oversample);
          if (de.kernel_size<0) {
+            fprintf(stderr,"de.kernel_size returned 0 - aborting.\n");
             return(1);
          }
       } else
@@ -673,11 +676,15 @@ static int render_rectangle(flam3_frame *spec, void *out,
          flam3_interpolate(spec->genomes, spec->ngenomes, temporal_sample_time, 0, &cp);
 
          /* Get the xforms ready to render */
-         if (prepare_xform_fn_ptrs(&cp, &spec->rc))
+         if (prepare_xform_fn_ptrs(&cp, &spec->rc)) {
+            fprintf(stderr,"prepare xform pointers returned error: aborting.\n");
             return(1);
+         }
          xform_distrib = flam3_create_xform_distrib(&cp);
-         if (xform_distrib==NULL)
+         if (xform_distrib==NULL) {
+            fprintf(stderr,"create xform distrib returned error: aborting.\n");
             return(1);
+         }
 
          /* compute the colormap entries.                             */
          /* the input colormap is 256 long with entries from 0 to 1.0 */
