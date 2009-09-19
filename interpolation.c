@@ -132,8 +132,8 @@ int compare_xforms(const void *av, const void *bv) {
    ad = det_matrix(aa);
    bd = det_matrix(bb);
 
-   if (a->color_speed < b->color_speed) return 1;
-   if (a->color_speed > b->color_speed) return -1;
+   if (a->color_speed > b->color_speed) return 1;
+   if (a->color_speed < b->color_speed) return -1;
    if (a->color_speed) {
       if (ad < 0) return -1;
       if (bd < 0) return 1;
@@ -671,8 +671,8 @@ void establish_asymmetric_refangles(flam3_genome *cp, int ncps) {
             /* to avoid overwriting if asymmetric on both sides                */
             padsymflag = 0;
          
-            sym0 = (cp[k-1].xform[xfi].animate>0 || (cp[k-1].xform[xfi].padding==1 && padsymflag));
-            sym1 = (cp[k].xform[xfi].animate>0 || (cp[k].xform[xfi].padding==1 && padsymflag));
+            sym0 = (cp[k-1].xform[xfi].animate==0 || (cp[k-1].xform[xfi].padding==1 && padsymflag));
+            sym1 = (cp[k].xform[xfi].animate==0 || (cp[k].xform[xfi].padding==1 && padsymflag));
 
             if ( sym1 && !sym0 )
                cp[k].xform[xfi].wind[col] = cxang[k-1][col] + 2*M_PI;

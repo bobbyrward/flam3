@@ -466,7 +466,7 @@ void flam3_rotate(flam3_genome *cp, double by, int interpolation_type) {
       double dtheta = by * 2.0 * M_PI / 360.0;
 
       /* Don't rotate xforms with > 0 animate values */
-      if (cp->xform[i].animate > 0.0)
+      if (cp->xform[i].animate == 0.0)
          continue;
 
       if (cp->xform[i].padding == 1) {
@@ -1159,11 +1159,11 @@ void flam3_copyx(flam3_genome *dest, flam3_genome *src, int dest_std_xforms, int
          flam3_copy_xform(&dest->xform[dest->num_xforms-1],&src->xform[i]);
          
       } else {
-         /* Interpolated-against final xforms need animate & color_speed set to 1.0 */
+         /* Interpolated-against final xforms need animate & color_speed set to 0.0 */
          dest->xform[dest->num_xforms-1].num_motion = 0;
          dest->xform[dest->num_xforms-1].motion=NULL;
-         dest->xform[dest->num_xforms-1].animate=1.0;
-         dest->xform[dest->num_xforms-1].color_speed=1.0;
+         dest->xform[dest->num_xforms-1].animate=0.0;
+         dest->xform[dest->num_xforms-1].color_speed=0.0;
       }
 
    } else {
@@ -1773,7 +1773,7 @@ void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, doub
       fprintf(f, "color=\"%g\" ", x->color);
    
    if (flam27_flag)
-      fprintf(f, "symmetry=\"%g\" ", x->color_speed);
+      fprintf(f, "symmetry=\"%g\" ", 1.0-x->color_speed);
    else if (!motion_flag || x->color_speed != 0.0)   
       fprintf(f, "color_speed=\"%g\" ", x->color_speed);
    
@@ -2375,8 +2375,8 @@ void flam3_add_symmetry(flam3_genome *cp, int sym) {
       flam3_add_xforms(cp,1,0,0);
 
       cp->xform[i].density = 1.0;
-      cp->xform[i].color_speed = 1.0;
-      cp->xform[i].animate = 1.0;
+      cp->xform[i].color_speed = 0.0;
+      cp->xform[i].animate = 0.0;
       cp->xform[i].var[0] = 1.0;
       for (j = 1; j < flam3_nvariations; j++)
          cp->xform[i].var[j] = 0;
@@ -2400,8 +2400,8 @@ void flam3_add_symmetry(flam3_genome *cp, int sym) {
       flam3_add_xforms(cp, 1, 0,0);
 
       cp->xform[i].density = 1.0;
-      cp->xform[i].color_speed = 1.0;
-      cp->xform[i].animate = 1.0;
+      cp->xform[i].color_speed = 0.0;
+      cp->xform[i].animate = 0.0;
       cp->xform[i].var[0] = 1.0;
       for (j = 1; j < flam3_nvariations; j++)
          cp->xform[i].var[j] = 0;
@@ -2906,8 +2906,8 @@ void flam3_random(flam3_genome *cp, int *ivars, int ivars_n, int sym, int spec_x
       int j, k;
       cp->xform[i].density = 1.0 / nxforms;
       cp->xform[i].color = i&1;
-      cp->xform[i].color_speed = 0.0;
-      cp->xform[i].animate = 0.0;
+      cp->xform[i].color_speed = 1.0;
+      cp->xform[i].animate = 1.0;
       for (j = 0; j < 3; j++) {
          for (k = 0; k < 2; k++) {
             cp->xform[i].c[j][k] = flam3_random11();
