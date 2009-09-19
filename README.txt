@@ -295,6 +295,13 @@ changelog:
       'visibility'.  visibility and chaos are both interpolatable.
     - <motion> tag now available for xforms...allows cyclic variation
       of any regular xform parameter/coef/post.
+    - symmetry has been broken out into color_speed and animate tags
+      with the same sense (which is confusing and will be fixed in a
+      future release).
+    - set the flam27 parameter to output backwards compatible genomes.
+    - passes the consistency test where rendering an image at double
+      size and filtering it down produces the same results as the
+      original (modulo quality).
 
 03/17/09 Added fuzz testing with zzuf to the regression tests.  'Strip'
     mode and genomes with the zoom parameter used now break into pieces
