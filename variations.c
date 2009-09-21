@@ -1918,8 +1918,10 @@ int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *rc)
 
    f.rc = rc;
 
-   s = 1.0-cp->xform[fn].color_speed;
-   s1 = 0.5 - 0.5 * s;
+//   s = 1.0-2.0*cp->xform[fn].color_speed;
+//   s1 = 0.5 - 0.5 * s;
+   s1 = cp->xform[fn].color_speed;
+   s = 1.0 - 2.0*s1;
 
    next_color = (p[2] + cp->xform[fn].color) * s1 + s * p[2];
    q[2] = next_color;
@@ -2155,7 +2157,7 @@ void initialize_xforms(flam3_genome *thiscp, int start_here) {
    for (i = start_here ; i < thiscp->num_xforms ; i++) {
       thiscp->xform[i].padding = 0;
       thiscp->xform[i].density = 0.0;
-      thiscp->xform[i].color_speed = 1.0;
+      thiscp->xform[i].color_speed = 0.5;
       thiscp->xform[i].animate = 1.0;
       thiscp->xform[i].color = i&1;
       thiscp->xform[i].opacity = 1.0;

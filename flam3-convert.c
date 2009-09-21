@@ -83,7 +83,7 @@ void parse_control_point_old(char **ss, flam3_genome *cp) {
    for (i = 0; i < flam3_nxforms; i++) {
       cp->xform[i].density = 0.0;
       cp->xform[i].color = i&1;
-      cp->xform[i].color_speed = 1.0;
+      cp->xform[i].color_speed = 0.5;
       cp->xform[i].animate = 1.0;
       cp->xform[i].var[0] = 1.0;
       for (j = 1; j < flam3_nvariations; j++)

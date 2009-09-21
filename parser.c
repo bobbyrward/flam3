@@ -752,7 +752,7 @@ int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_xaos,
          this_xform->density = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"symmetry")) {
          /* Deprecated.  Set both color_speed and animate to this value. */
-         this_xform->color_speed = 1-flam3_atof(att_str);
+         this_xform->color_speed = (1.0-flam3_atof(att_str))/2.0;
          this_xform->animate = flam3_atof(att_str)>0 ? 0 : 1;
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"color_speed")) {
          this_xform->color_speed = flam3_atof(att_str);

@@ -1773,7 +1773,7 @@ void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, doub
       fprintf(f, "color=\"%g\" ", x->color);
    
    if (flam27_flag)
-      fprintf(f, "symmetry=\"%g\" ", 1.0-x->color_speed);
+      fprintf(f, "symmetry=\"%g\" ", 1.0-2.0*x->color_speed);
    else if (!motion_flag || x->color_speed != 0.0)   
       fprintf(f, "color_speed=\"%g\" ", x->color_speed);
    
@@ -2906,7 +2906,7 @@ void flam3_random(flam3_genome *cp, int *ivars, int ivars_n, int sym, int spec_x
       int j, k;
       cp->xform[i].density = 1.0 / nxforms;
       cp->xform[i].color = i&1;
-      cp->xform[i].color_speed = 1.0;
+      cp->xform[i].color_speed = 0.5;
       cp->xform[i].animate = 1.0;
       for (j = 0; j < 3; j++) {
          for (k = 0; k < 2; k++) {
