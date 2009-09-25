@@ -1997,10 +1997,10 @@ void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, doub
       }
 
       if (oscope_var==1) {
-         fprintf(f, "oscope_separation=\"%g\" ", x->oscope_separation);
-         fprintf(f, "oscope_frequency=\"%g\" ", x->oscope_frequency);
-         fprintf(f, "oscope_amplitude=\"%g\" ", x->oscope_amplitude);
-         fprintf(f, "oscope_damping=\"%g\" ", x->oscope_damping);
+         fprintf(f, "oscilloscope_separation=\"%g\" ", x->oscope_separation);
+         fprintf(f, "oscilloscope_frequency=\"%g\" ", x->oscope_frequency);
+         fprintf(f, "oscilloscope_amplitude=\"%g\" ", x->oscope_amplitude);
+         fprintf(f, "oscilloscope_damping=\"%g\" ", x->oscope_damping);
       }
 
       if (popcorn2_var==1) {

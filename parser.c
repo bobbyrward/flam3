@@ -1034,6 +1034,14 @@ int parse_xform_xml(xmlNode *chld_node,flam3_xform *this_xform, int *num_xaos,
          this_xform->modulus_x = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"modulus_y")) {
          this_xform->modulus_y = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscilloscope_separation")) {
+         this_xform->oscope_separation = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscilloscope_frequency")) {
+         this_xform->oscope_frequency = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscilloscope_amplitude")) {
+         this_xform->oscope_amplitude = flam3_atof(att_str);
+      } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscilloscope_damping")) {
+         this_xform->oscope_damping = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscope_separation")) {
          this_xform->oscope_separation = flam3_atof(att_str);
       } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"oscope_frequency")) {
