@@ -1332,7 +1332,8 @@ flam3_genome *flam3_parse_xml2(char *xmldata, char *xmlfilename, int default_fla
    int i;
    int loc_all_ncps=0;
    flam3_genome *loc_all_cp=NULL;
-   
+   char* locale = NULL;
+   char* lorig  = setlocale(LC_NUMERIC, NULL);
 
    /* Parse XML string into internal document */
    /* Forbid network access during read       */
@@ -1346,12 +1347,9 @@ flam3_genome *flam3_parse_xml2(char *xmldata, char *xmlfilename, int default_fla
 
    /* What is the root node of the document? */
    rootnode = xmlDocGetRootElement(doc);
-
    
    // force use of "C" locale when writing reals.
    // first save away the current settings.
-   char* locale = NULL;
-   char* lorig  = setlocale(LC_NUMERIC, NULL);
    if (lorig == NULL)
       fprintf(stderr, "error: couldn't get current locale\n");
    else {
