@@ -453,11 +453,12 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
       double csave[2];     
       double td;
       int all_id;
+      int nx = cpi[0].num_xforms-(cpi[0].final_xform_index>=0);
       
-      if (ncp==2 && stagger>0) { // && i!=cpi[0].final_xform_index) {
+      if (ncp==2 && stagger>0 && i!=cpi[0].final_xform_index) {
          csave[0] = c[0];
          csave[1] = c[1];
-         c[0] = get_stagger_coef(csave[0],stagger,cpi[0].num_xforms,i);
+         c[0] = get_stagger_coef(csave[0],stagger,nx,i);
          c[1] = 1.0-c[0];
       }
       
@@ -617,7 +618,7 @@ void flam3_interpolate_n(flam3_genome *result, int ncp,
          }
       }
       
-      if (ncp==2 && stagger>0) {
+      if (ncp==2 && stagger>0 && i!=cpi[0].final_xform_index) {
          c[0] = csave[0];
          c[1] = csave[1];
       }
