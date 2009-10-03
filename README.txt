@@ -101,7 +101,9 @@ New in 2.8:
 earlyclip       0               enables the early clipping of rgb values for better antialiasing and resizing
                                 defaults to 0 for backwards compatibility
 flam27          0               flam3 2.7 compatibility mode; ensures generated genomes can be used by flam3 2.7.18
-                                
+stagger         0               affects simultaneity of xform interpolation during genome interpolation.
+                                represents how 'separate' the xforms are interpolated.  set to 1 for each
+                                xform to be interpolated individually, fractions control interp overlap.
 
 for example:
 
@@ -283,6 +285,13 @@ todo:  eliminate all static storage.
 
 changelog:
 
+10/03/09 Changed color_speed range from 0 (no color change) to 1
+    (use new xform color).  Animate attribute is now 0 for no motion,
+    1 for motion.  Removed final xform from stagger algorithm.  'oscope'
+    parameters are now called 'oscilloscope' to match the rest of the
+    parametric variations (backwards compatible, so old genomes can be
+    read.) Release as 2.8beta3.
+
 03/18/09 Major upgrade :
     - 28 variations added, mostly from the sourceforge plugins pack
     - significant speed optimization of variations
@@ -295,6 +304,9 @@ changelog:
       'visibility'.  visibility and chaos are both interpolatable.
     - <motion> tag now available for xforms...allows cyclic variation
       of any regular xform parameter/coef/post.
+    - env var 'stagger' affects the simultaneity of xform interpolation
+      when morphing from one flame to another.  set to 0 for existing
+      behaviour, set to 1 to make each xform interpolate individually
     - symmetry has been broken out into color_speed and animate tags
       with the same sense (which is confusing and will be fixed in a
       future release).

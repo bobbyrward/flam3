@@ -107,6 +107,10 @@ static char *the_docstring1 =
 "earlyclip       0               enables the early clipping of rgb values for better antialiasing and resizing\n"
 "                                defaults to 0 for backwards compatibility\n"
 "flam27          0               flam3 2.7 compatibility mode; ensures generated genomes can be used by flam3 2.7.18\n"
+"stagger         0               affects simultaneity of xform interpolation during genome interpolation.\n"
+"                                represents how 'separate' the xforms are interpolated.  set to 1 for each\n"
+"                                xform to be interpolated individually, fractions control interp overlap.\n"
+
 "\n"
 "for example:\n"
 "\n"
