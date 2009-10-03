@@ -107,7 +107,7 @@ xmlDocPtr create_new_editdoc(char *action, flam3_genome *parent0, flam3_genome *
    localt = localtime(&mytime);
    /* XXX use standard time format including timezone */
    strftime(timestring, 100, "%a %b %e %H:%M:%S %z %Y", localt);
-   xmlNewProp(root_node,s (const xmlChar *)"date", (const xmlChar *)timestring);
+   xmlNewProp(root_node, (const xmlChar *)"date", (const xmlChar *)timestring);
 
    /* nick */
    if (nick) {
