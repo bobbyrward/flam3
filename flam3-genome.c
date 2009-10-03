@@ -107,7 +107,7 @@ xmlDocPtr create_new_editdoc(char *action, flam3_genome *parent0, flam3_genome *
    localt = localtime(&mytime);
    /* XXX use standard time format including timezone */
    strftime(timestring, 100, "%a %b %e %H:%M:%S %z %Y", localt);
-   xmlNewProp(root_node, (const xmlChar *)"date", (const xmlChar *)timestring);
+   xmlNewProp(root_node,s (const xmlChar *)"date", (const xmlChar *)timestring);
 
    /* nick */
    if (nick) {
@@ -635,7 +635,8 @@ main(argc, argv)
       int first_frame,last_frame;
       int ftime,iscp;
       cp = string_to_cp(clone, &ncp);
-
+      double stagger = argf("stagger", 0.0);
+      
       for (i = 0; i < ncp; i++) {
          if (i > 0 && cp[i].time <= cp[i-1].time) {
             fprintf(stderr, "error: control points must be sorted by time, but %g <= %g, index %d.\n",
@@ -671,7 +672,7 @@ main(argc, argv)
             }
          }
          if (iscp==0) {
-            flam3_interpolate(cp, ncp, (double)ftime, 0, &interpolated);
+            flam3_interpolate(cp, ncp, (double)ftime, stagger, &interpolated);
             for (i=0;i<ncp;i++) {
                if ( ftime==cp[i].time-1 ) {
                   iscp=1;
