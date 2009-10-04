@@ -290,7 +290,8 @@ changelog:
     1 for motion.  Removed final xform from stagger algorithm.  'oscope'
     parameters are now called 'oscilloscope' to match the rest of the
     parametric variations (backwards compatible, so old genomes can be
-    read.) Release as 2.8beta3.
+    read.) Stagger now affects morphing as well as sheep rotation, but
+    only using flam3-genome (not flam3-animate).  Release as 2.8beta3.
 
 03/18/09 Major upgrade :
     - 28 variations added, mostly from the sourceforge plugins pack
@@ -301,7 +302,7 @@ changelog:
       dense areas, eliminating the hue shift bug
     - Apophysis chaos and solo xform/plotmode features have been
       implemented.  solo/plotmode are promoted to floating point
-      'visibility'.  visibility and chaos are both interpolatable.
+      'opacity'.  opacity and chaos are both interpolatable.
     - <motion> tag now available for xforms...allows cyclic variation
       of any regular xform parameter/coef/post.
     - env var 'stagger' affects the simultaneity of xform interpolation
