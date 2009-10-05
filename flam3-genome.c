@@ -634,8 +634,9 @@ main(argc, argv)
       flam3_genome interpolated;
       int first_frame,last_frame;
       int ftime,iscp;
-      cp = string_to_cp(clone, &ncp);
       double stagger = argf("stagger", 0.0);
+      cp = string_to_cp(animate, &ncp);
+      
       
       for (i = 0; i < ncp; i++) {
          if (i > 0 && cp[i].time <= cp[i-1].time) {
