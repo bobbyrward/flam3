@@ -3319,11 +3319,10 @@ int flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
    int low_target, high_target;
    double min[2], max[2];
    double *points;
+   int bv;
    unsigned short *xform_distrib;
 
    if (nsamples <= 0) nsamples = 10000;
-   low_target = (int)(nsamples * eps);
-   high_target = nsamples - low_target;
 
    points = (double *) malloc(sizeof(double) * 4 * nsamples);
    points[0] = flam3_random_isaac_11(rc);
@@ -3332,13 +3331,23 @@ int flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
    points[3] = 0.0;
 
    if (prepare_xform_fn_ptrs(cp,rc))
-      return(1);
+      return(-1);
    xform_distrib = flam3_create_xform_distrib(cp);
    if (xform_distrib==NULL)
-      return(1);
-   flam3_iterate(cp, nsamples, 20, points, xform_distrib, rc);
+      return(-1);
+   bv=flam3_iterate(cp, nsamples, 20, points, xform_distrib, rc);
    free(xform_distrib);
+      
+   if ( bv/(double)nsamples > eps )
+      eps = 3*bv/(double)nsamples;
+   
+   if ( eps > 0.3 )
+      eps = 0.3;
+      
+   low_target = (int)(nsamples * eps);
+   high_target = nsamples - low_target;
 
+   
    min[0] = min[1] =  1e10;
    max[0] = max[1] = -1e10;
 
@@ -3356,7 +3365,7 @@ int flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
       bmax[0] = max[0];
       bmax[1] = max[1];
       free(points);
-      return(0);
+      return(bv);
    }
 
    qsort(points, nsamples, sizeof(double) * 4, sort_by_x);
@@ -3368,7 +3377,7 @@ int flam3_estimate_bounding_box(flam3_genome *cp, double eps, int nsamples,
    bmax[1] = points[4 * high_target + 1];
    free(points);
    
-   return(0);
+   return(bv);
 }
 
 
@@ -3711,7 +3720,7 @@ double flam3_dimension(flam3_genome *cp, int ntries, int clip_to_camera) {
     bmax[0] = corner0 + cp->width  / ppux;
     bmax[1] = corner1 + cp->height / ppux;
   } else {
-    if (flam3_estimate_bounding_box(cp, 0.0, 0, bmin, bmax, &rc))
+    if (flam3_estimate_bounding_box(cp, 0.0, 0, bmin, bmax, &rc)<0)
        return(-1.0);
        
   }
