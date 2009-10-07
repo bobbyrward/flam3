@@ -526,7 +526,7 @@ void apply_motion_parameters(flam3_xform *xf, flam3_xform *addto, double blend);
 
 /* genomes is array ngenomes long, with times set and in ascending order.
    interpolate to the requested time and return in result */
-void flam3_interpolate(flam3_genome *genomes, int ngenomes, double time, double stagger, flam3_genome *result);
+EXPORT void flam3_interpolate(flam3_genome *genomes, int ngenomes, double time, double stagger, flam3_genome *result);
 
 /* print genome to given file with extra_attributes if not NULL */
 void flam3_print(FILE *f, flam3_genome *g, char *extra_attributes, int print_edits);
@@ -552,7 +552,7 @@ void flam3_add_symmetry(flam3_genome *g, int sym);
 
 void flam3_improve_colors(flam3_genome *g, int ntries, int change_palette, int color_resolution);
 EXPORT int flam3_colorhist(flam3_genome *cp, int num_batches, double *hist);
-int flam3_estimate_bounding_box(flam3_genome *g, double eps, int nsamples,
+EXPORT int flam3_estimate_bounding_box(flam3_genome *g, double eps, int nsamples,
              double *bmin, double *bmax, randctx *rc);
 void flam3_rotate(flam3_genome *g, double angle, int interp_type); /* angle in degrees */
 
