@@ -285,6 +285,11 @@ todo:  eliminate all static storage.
 
 changelog:
 
+10/07/09 Fixed bug affecting 'animate' mode with flam3-genome.  Changed
+	estimate_bounding_box to increase discarded iterations if numerous
+	badvals were encountered during iterations.  Exported a few more
+	functions for Windows DLL.  Release as 2.8beta4.
+
 10/03/09 Changed color_speed range from 0 (no color change) to 1
     (use new xform color).  Animate attribute is now 0 for no motion,
     1 for motion.  Removed final xform from stagger algorithm.  'oscope'
