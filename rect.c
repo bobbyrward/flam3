@@ -179,9 +179,28 @@ static void de_thread(void *dth) {
       
          if (dthp->last_thread) {
          
-            if ((*dthp->spec->progress)(dthp->spec->progress_parameter,
-				      100*(j-str)/(double)(enr-str), 1, 0)) {
-				   *(dthp->aborted) = 1;
+            int rv = (*dthp->spec->progress)(dthp->spec->progress_parameter,
+				      100*(j-str)/(double)(enr-str), 1, 0);
+				      
+            if (rv==2) { /* PAUSE */
+               
+               struct timespec pauset;
+               pauset.tv_sec = 0;
+               pauset.tv_nsec = 100000000;
+               
+               do {
+#if defined(_WIN32) /* mingw or msvc */
+				   Sleep(100);
+#else
+				   nanosleep(&pauset,NULL);
+#endif
+                  rv = (*dthp->spec->progress)(dthp->spec->progress_parameter,
+                     100*(j-str)/(double)(enr-str), 1, 0);
+               } while (rv==2);
+            }
+
+	        if (rv==1){
+			   *(dthp->aborted) = 1;
 #ifdef HAVE_LIBPTHREAD
                pthread_exit((void *)0);
 #else
