@@ -311,6 +311,9 @@ static void iter_thread(void *fth) {
                struct timespec pauset;
                pauset.tv_sec = 0;
                pauset.tv_nsec = 100000000;
+               int lastpt = progress_history_mark-1;
+               if (lastpt<0)
+                  lastpt = 63;
                
                do {
 #if defined(_WIN32) /* mingw or msvc */
@@ -320,6 +323,12 @@ static void iter_thread(void *fth) {
 #endif
                   rv = (*ficp->spec->progress)(ficp->spec->progress_parameter, percent, 0, eta);
                } while (rv==2);
+               
+                /* Set last timer to current time */
+               	progress_timer = 0;
+               	memset(progress_timer_history,0,64*sizeof(time_t));
+               	memset(progress_history,0,64*sizeof(double));
+               	progress_history_mark = 0;
             }
                   
             if (rv==1) { /* ABORT */
