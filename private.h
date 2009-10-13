@@ -84,6 +84,11 @@ typedef struct {
    double batch_size;
    int temporal_sample_num,ntemporal_samples;
    int batch_num, nbatches, aborted;
+   time_t *progress_timer;
+   time_t *progress_timer_history;
+   double *progress_history;
+   int *progress_history_mark;
+   
 } flam3_iter_constants;
 
 typedef struct {

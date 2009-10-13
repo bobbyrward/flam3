@@ -235,18 +235,15 @@ static void iter_thread(void *fth) {
    int j;
    flam3_thread_helper *fthp = (flam3_thread_helper *)fth;
    flam3_iter_constants *ficp = fthp->fic;
-   /* Timer information needs to be persistent - only updated by 1 thread*/
-   static time_t progress_timer;
-   static time_t progress_timer_history[64];
-   static double progress_history[64];
-   static int progress_history_mark = 0;
+
    double eta = 0.0;
    
    if (fthp->timer_initialize) {
-   	progress_timer = 0;
-   	memset(progress_timer_history,0,64*sizeof(time_t));
-   	memset(progress_history,0,64*sizeof(double));
-   	progress_history_mark = 0;
+   	*(ficp->progress_timer) = 0;
+   	memset(ficp->progress_timer_history,0,64*sizeof(time_t));
+   	memset(ficp->progress_history,0,64*sizeof(double));
+   	*(ficp->progress_history_mark) = 0;
+   	fprintf(stderr,"resetting\n");
    }
    
    for (sub_batch = 0; sub_batch < ficp->batch_size; sub_batch+=SUB_BATCH_SIZE) {
@@ -256,7 +253,7 @@ static void iter_thread(void *fth) {
       sub_batch_size = (sub_batch + SUB_BATCH_SIZE > ficp->batch_size) ?
                            (ficp->batch_size - sub_batch) : SUB_BATCH_SIZE;
                            
-      if (fthp->first_thread && newt != progress_timer) {
+      if (fthp->first_thread && newt != *(ficp->progress_timer)) {
          double percent = 100.0 *
              ((((sub_batch / (double) ficp->batch_size) + ficp->temporal_sample_num)
              / ficp->ntemporal_samples) + ficp->batch_num)/ficp->nbatches;
@@ -266,17 +263,17 @@ static void iter_thread(void *fth) {
          if (ficp->spec->verbose)
             fprintf(stderr, "\rchaos: %5.1f%%", percent);
             
-         progress_timer = newt;
-         if (progress_timer_history[progress_history_mark] &&
-                progress_history[progress_history_mark] < percent)
-            old_mark = progress_history_mark;
+         *(ficp->progress_timer) = newt;
+         if (ficp->progress_timer_history[*(ficp->progress_history_mark)] &&
+                ficp->progress_history[*(ficp->progress_history_mark)] < percent)
+            old_mark = *(ficp->progress_history_mark);
 
          if (percent > 0) {
-            eta = (100 - percent) * (progress_timer - progress_timer_history[old_mark])
-                  / (percent - progress_history[old_mark]);
+            eta = (100 - percent) * (*(ficp->progress_timer) - ficp->progress_timer_history[old_mark])
+                  / (percent - ficp->progress_history[old_mark]);
 
             if (ficp->spec->verbose) {
-               ticker = (progress_timer&1)?':':'.';
+               ticker = (*(ficp->progress_timer)&1)?':':'.';
                if (eta < 1000)
                   ticker = ':';
                if (eta > 100)
@@ -288,9 +285,10 @@ static void iter_thread(void *fth) {
             }
          }
 
-         progress_timer_history[progress_history_mark] = progress_timer;
-         progress_history[progress_history_mark] = percent;
-         progress_history_mark = (progress_history_mark + 1) % 64;
+         ficp->progress_timer_history[*(ficp->progress_history_mark)] = *(ficp->progress_timer);
+         ficp->progress_history[*(ficp->progress_history_mark)] = percent;
+         *(ficp->progress_history_mark) = (*(ficp->progress_history_mark) + 1) % 64;
+         fprintf(stderr,"updated phm: %d\n",*(ficp->progress_history_mark));
       }
 
       /* Custom progress function */
@@ -308,12 +306,12 @@ static void iter_thread(void *fth) {
             
             if (rv==2) { /* PAUSE */
                
+               time_t tnow = time(NULL);
+               time_t tend;
                struct timespec pauset;
                pauset.tv_sec = 0;
                pauset.tv_nsec = 100000000;
-               int lastpt = progress_history_mark-1;
-               if (lastpt<0)
-                  lastpt = 63;
+               int lastpt;
                
                do {
 #if defined(_WIN32) /* mingw or msvc */
@@ -324,11 +322,15 @@ static void iter_thread(void *fth) {
                   rv = (*ficp->spec->progress)(ficp->spec->progress_parameter, percent, 0, eta);
                } while (rv==2);
                
-                /* Set last timer to current time */
-               	progress_timer = 0;
-               	memset(progress_timer_history,0,64*sizeof(time_t));
-               	memset(progress_history,0,64*sizeof(double));
-               	progress_history_mark = 0;
+               /* modify the timer history to compensate for the pause */
+               tend = time(NULL)-tnow;
+
+               for (lastpt=0;lastpt<64;lastpt++) {
+                  if (ficp->progress_timer_history[lastpt]) {
+                      ficp->progress_timer_history[lastpt] += tend;
+                  }
+               }
+               
             }
                   
             if (rv==1) { /* ABORT */
@@ -526,6 +528,12 @@ static int render_rectangle(flam3_frame *spec, void *out,
    
    char *last_block;
    size_t memory_rqd;
+
+   /* Per-render progress timers */
+   time_t progress_timer=0;
+   time_t progress_timer_history[64];
+   double progress_history[64];
+   int progress_history_mark = 0;
 
    tstart = time(NULL);
 
@@ -787,6 +795,12 @@ static int render_rectangle(flam3_frame *spec, void *out,
          fic.dmap = (flam3_palette_entry *)dmap;
          fic.color_scalar = color_scalar;
          fic.buckets = (void *)buckets;
+         
+         /* Need a timer per job */
+         fic.progress_timer = &progress_timer;
+         fic.progress_timer_history = &(progress_timer_history[0]);
+         fic.progress_history = &(progress_history[0]);
+         fic.progress_history_mark = &progress_history_mark;
 
          /* Initialize the thread helper structures */
          for (thi = 0; thi < spec->nthreads; thi++) {
