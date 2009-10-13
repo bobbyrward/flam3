@@ -243,7 +243,6 @@ static void iter_thread(void *fth) {
    	memset(ficp->progress_timer_history,0,64*sizeof(time_t));
    	memset(ficp->progress_history,0,64*sizeof(double));
    	*(ficp->progress_history_mark) = 0;
-   	fprintf(stderr,"resetting\n");
    }
    
    for (sub_batch = 0; sub_batch < ficp->batch_size; sub_batch+=SUB_BATCH_SIZE) {
@@ -288,7 +287,6 @@ static void iter_thread(void *fth) {
          ficp->progress_timer_history[*(ficp->progress_history_mark)] = *(ficp->progress_timer);
          ficp->progress_history[*(ficp->progress_history_mark)] = percent;
          *(ficp->progress_history_mark) = (*(ficp->progress_history_mark) + 1) % 64;
-         fprintf(stderr,"updated phm: %d\n",*(ficp->progress_history_mark));
       }
 
       /* Custom progress function */
