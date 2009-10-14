@@ -285,6 +285,11 @@ todo:  eliminate all static storage.
 
 changelog:
 
+10/13/09 Non-threadsafe progress tracking code in main iteration thread
+    replaced with per-render progress storage.  Fixed bug where pausing
+    render during density estimation stage terminated render.  Release
+    as 2.8beta5.
+
 10/07/09 Fixed bug affecting 'animate' mode with flam3-genome.  Changed
 	estimate_bounding_box to increase discarded iterations if numerous
 	badvals were encountered during iterations.  Exported a few more
