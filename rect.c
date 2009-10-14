@@ -307,9 +307,9 @@ static void iter_thread(void *fth) {
                time_t tnow = time(NULL);
                time_t tend;
                struct timespec pauset;
+               int lastpt;
                pauset.tv_sec = 0;
                pauset.tv_nsec = 100000000;
-               int lastpt;
                
                do {
 #if defined(_WIN32) /* mingw or msvc */
