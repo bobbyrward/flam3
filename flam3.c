@@ -239,8 +239,11 @@ int flam3_iterate(flam3_genome *cp, int n, int fuse,  double *samples, unsigned 
       p[2] = q[2];
       p[3] = q[3];
 
-      if (cp->final_xform_enable == 1)
+      if (cp->final_xform_enable == 1) {
          apply_xform(cp, cp->final_xform_index, p, q, rc);
+         /* Keep the opacity from the original xform */
+         q[3] = p[3];
+      }
 
       /* if fuse over, store it */
       if (i >= 0) {
