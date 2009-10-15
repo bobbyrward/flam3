@@ -1719,8 +1719,8 @@ void var81_waves2 (flam3_iter_helper *f, double weight) {
    
    /* waves2 from Joel F */
    
-   f->p0 += weight*(f->tx + f->xform->waves2_scalex)*sin(f->ty * f->xform->waves2_freqx);
-   f->p1 += weight*(f->ty + f->xform->waves2_scaley)*sin(f->tx * f->xform->waves2_freqy);
+   f->p0 += weight*(f->tx + f->xform->waves2_scalex*sin(f->ty * f->xform->waves2_freqx));
+   f->p1 += weight*(f->ty + f->xform->waves2_scaley*sin(f->tx * f->xform->waves2_freqy));
 
 }
 
