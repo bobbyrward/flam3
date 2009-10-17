@@ -343,6 +343,10 @@ int flam3_colorhist(flam3_genome *cp, int num_batches, double *hist) {
       hist[mycolor] += 1;
     }
   }
+  
+  for (plp=0;plp<256;plp++)
+    hist[plp] /= (float)(num_batches*SUB_BATCH_SIZE);
+    
   return(0);
 } 
   
