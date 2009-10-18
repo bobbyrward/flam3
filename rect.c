@@ -224,12 +224,6 @@ static void de_thread(void *dth) {
 
 }
 
-
-#if defined(HAVE_LIBPTHREAD) && defined(USE_LOCKS)
-  /* mutex for bucket accumulator */
-  pthread_mutex_t bucket_mutex;
-#endif
-
 static void iter_thread(void *fth) {
    double sub_batch;
    int j;
@@ -359,7 +353,7 @@ static void iter_thread(void *fth) {
 
       #if defined(HAVE_LIBPTHREAD) && defined(USE_LOCKS)
         /* Lock mutex for access to accumulator */
-        pthread_mutex_lock(&bucket_mutex);
+        pthread_mutex_lock(&ficp->bucket_mutex);
       #endif
 
       /* Add the badcount to the counter */
@@ -475,7 +469,7 @@ static void iter_thread(void *fth) {
       
       #if defined(HAVE_LIBPTHREAD) && defined(USE_LOCKS)
         /* Release mutex */
-        pthread_mutex_unlock(&bucket_mutex);
+        pthread_mutex_unlock(&ficp->bucket_mutex);
       #endif
 
    }
@@ -834,7 +828,7 @@ static int render_rectangle(flam3_frame *spec, void *out,
          myThreads = (pthread_t *)malloc(spec->nthreads * sizeof(pthread_t));
 
          #if defined(USE_LOCKS)
-         pthread_mutex_init(&bucket_mutex, NULL);
+         pthread_mutex_init(&fic.bucket_mutex, NULL);
          #endif
 
          pthread_attr_init(&pt_attr);
@@ -850,7 +844,7 @@ static int render_rectangle(flam3_frame *spec, void *out,
             pthread_join(myThreads[thi], (void **)&thread_status);
 
          #if defined(USE_LOCKS)
-         pthread_mutex_destroy(&bucket_mutex);
+         pthread_mutex_destroy(&fic.bucket_mutex);
          #endif
          
          free(myThreads);

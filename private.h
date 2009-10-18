@@ -20,7 +20,7 @@
 #define private_included
 
 #include "flam3.h"
-
+#include "config.h"
 #include <stdlib.h>
 
 #include <ctype.h>
@@ -38,6 +38,10 @@
 #endif
 
 #include <math.h>
+
+#ifdef HAVE_LIBPTHREAD
+#include <pthread.h>
+#endif
 
 #define PREFILTER_WHITE 255
 #define EPS (1e-10)
@@ -88,6 +92,10 @@ typedef struct {
    time_t *progress_timer_history;
    double *progress_history;
    int *progress_history_mark;
+#ifdef HAVE_LIBPTHREAD
+   /* mutex for bucket accumulator */
+   pthread_mutex_t bucket_mutex;
+#endif
    
 } flam3_iter_constants;
 
