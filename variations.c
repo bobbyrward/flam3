@@ -1824,6 +1824,8 @@ int prepare_xform_fn_ptrs(flam3_genome *cp, randctx *rc) {
       cp->xform[i].precalc_atan_xy_flag=0;
       cp->xform[i].precalc_atan_yx_flag=0;
       cp->xform[i].has_preblur=0;
+      cp->xform[i].has_post = !(id_matrix(cp->xform[i].post));
+
 
       for (j = 0; j < flam3_nvariations; j++) {
 
@@ -2133,7 +2135,7 @@ int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *rc)
 
    }
    /* apply the post transform */
-   if (!id_matrix(cp->xform[fn].post)) {
+   if (cp->xform[fn].has_post) {
       q[0] = cp->xform[fn].post[0][0] * f.p0 + cp->xform[fn].post[1][0] * f.p1 + cp->xform[fn].post[2][0];
       q[1] = cp->xform[fn].post[0][1] * f.p0 + cp->xform[fn].post[1][1] * f.p1 + cp->xform[fn].post[2][1];
    } else {

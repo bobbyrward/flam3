@@ -210,6 +210,7 @@ typedef struct xform {
    int precalc_atan_xy_flag;
    int precalc_atan_yx_flag;
    double has_preblur;
+   int has_post;
 
    /* Params for new parameterized variations */
    /* Blob */
