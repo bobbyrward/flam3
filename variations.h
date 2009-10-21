@@ -106,6 +106,20 @@ void var78_wedge_julia(flam3_iter_helper *, double);
 void var79_wedge_sph(flam3_iter_helper *, double);
 void var80_whorl(flam3_iter_helper *, double);
 void var81_waves2(flam3_iter_helper *, double);
+void var82_exp (flam3_iter_helper *f, double weight);
+void var83_log (flam3_iter_helper *f, double weight);
+void var84_sin (flam3_iter_helper *f, double weight);
+void var85_cos (flam3_iter_helper *f, double weight);
+void var86_tan (flam3_iter_helper *f, double weight);
+void var87_sec (flam3_iter_helper *f, double weight);
+void var88_csc (flam3_iter_helper *f, double weight);
+void var89_cot (flam3_iter_helper *f, double weight);
+void var90_sinh (flam3_iter_helper *f, double weight);
+void var91_cosh (flam3_iter_helper *f, double weight);
+void var92_tanh (flam3_iter_helper *f, double weight);
+void var93_sech (flam3_iter_helper *f, double weight);
+void var94_csch (flam3_iter_helper *f, double weight);
+void var95_coth (flam3_iter_helper *f, double weight);
 
 /* Precalculation functions */
 void perspective_precalc(flam3_xform *xf);

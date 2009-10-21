@@ -115,6 +115,20 @@ char *flam3_variation_names[1+flam3_nvariations] = {
   "wedge_sph",
   "whorl",
   "waves2",
+  "exp",
+  "log",
+  "sin",
+  "cos",
+  "tan",
+  "sec",
+  "csc",
+  "cot",
+  "sinh",
+  "cosh",
+  "tanh",
+  "sech",
+  "csch",
+  "coth",
   0
 };
 
@@ -1724,6 +1738,161 @@ void var81_waves2 (flam3_iter_helper *f, double weight) {
 
 }
 
+/* complex vars by cothe */
+/* exp log sin cos tan sec csc cot sinh cosh tanh sech csch coth */
+
+void var82_exp (flam3_iter_helper *f, double weight) {
+   //Exponential EXP
+   double expe = exp(f->tx);
+   double expcos,expsin;
+   sincos(f->ty,&expsin,&expcos);
+   f->p0 += weight * expe * expcos;
+   f->p1 += weight * expe * expsin;
+}
+        
+void var83_log (flam3_iter_helper *f, double weight) {
+   //Natural Logarithm LOG
+   // needs precalc_atanyx and precalc_sumsq
+   f->p0 += weight * 0.5 * log(f->precalc_sumsq);
+   f->p1 += weight * f->precalc_atanyx;
+}
+
+void var84_sin (flam3_iter_helper *f, double weight) {
+   //Sine SIN
+   double sinsin,sinacos,sinsinh,sincosh;
+   sincos(f->tx,&sinsin,&sinacos);
+   sinsinh = sinh(f->ty);
+   sincosh = cosh(f->ty);
+   f->p0 += weight * sinsin * sincosh;
+   f->p1 += weight * sinacos * sinsinh;
+}
+
+void var85_cos (flam3_iter_helper *f, double weight) {
+   //Cosine COS
+   double cossin,coscos,cossinh,coscosh;
+   sincos(f->tx,&cossin,&coscos);
+   cossinh = sinh(f->ty);
+   coscosh = cosh(f->ty);
+   f->p0 += weight * coscos * coscosh;
+   f->p1 -= weight * cossin * cossinh;
+}
+
+void var86_tan (flam3_iter_helper *f, double weight) {
+   //Tangent TAN
+   double tansin,tancos,tansinh,tancosh;
+   double tanden;
+   sincos(2*f->tx,&tansin,&tancos);
+   tansinh = sinh(2.0*f->ty);
+   tancosh = cosh(2.0*f->ty);
+   tanden = 1.0/(tancos + tancosh);
+   f->p0 += weight * tanden * tansin;
+   f->p1 += weight * tanden * tansinh;
+}
+
+void var87_sec (flam3_iter_helper *f, double weight) {
+   //Secant SEC
+   double secsin,seccos,secsinh,seccosh;
+   double secden;
+   sincos(f->tx,&secsin,&seccos);
+   secsinh = sinh(f->ty);
+   seccosh = cosh(f->ty);
+   secden = 2.0/(cos(2*f->tx) + cosh(2*f->ty));
+   f->p0 += weight * secden * seccos * seccosh;
+   f->p1 += weight * secden * secsin * secsinh;
+}
+
+void var88_csc (flam3_iter_helper *f, double weight) {
+   //Cosecant CSC
+   double cscsin,csccos,cscsinh,csccosh;
+   double cscden;
+   sincos(f->tx,&cscsin,&csccos);
+   cscsinh = sinh(f->ty);
+   csccosh = cosh(f->ty);
+   cscden = 2.0/(cosh(2.0*f->ty) - cos(2.0*f->tx));
+   f->p0 += weight * cscden * cscsin * csccosh;
+   f->p1 -= weight * cscden * csccos * cscsinh;
+}
+
+void var89_cot (flam3_iter_helper *f, double weight) {
+   //Cotangent COT
+   double cotsin,cotcos,cotsinh,cotcosh;
+   double cotden;
+   sincos(2.0*f->tx,&cotsin,&cotcos);
+   cotsinh = sinh(2.0*f->ty);
+   cotcosh = cosh(2.0*f->ty);
+   cotden = 1.0/(cotcosh - cotcos);
+   f->p0 += weight * cotden * cotsin;
+   f->p1 += weight * cotden * -1 * cotsinh;
+}
+
+void var90_sinh (flam3_iter_helper *f, double weight) {
+   //Hyperbolic Sine SINH
+   double sinhsin,sinhcos,sinhsinh,sinhcosh;
+   sincos(f->ty,&sinhsin,&sinhcos);
+   sinhsinh = sinh(f->tx);
+   sinhcosh = cosh(f->tx);
+   f->p0 += weight * sinhsinh * sinhcos;
+   f->p1 += weight * sinhcosh * sinhsin;
+}
+
+void var91_cosh (flam3_iter_helper *f, double weight) {
+   //Hyperbolic Cosine COSH
+   double coshsin,coshcos,coshsinh,coshcosh;
+   sincos(f->ty,&coshsin,&coshcos);
+   coshsinh = sinh(f->tx);
+   coshcosh = cosh(f->tx);
+   f->p0 += weight * coshcosh * coshcos;
+   f->p1 += weight * coshsinh * coshsin;
+}
+
+void var92_tanh (flam3_iter_helper *f, double weight) {
+   //Hyperbolic Tangent TANH
+   double tanhsin,tanhcos,tanhsinh,tanhcosh;
+   double tanhden;
+   sincos(2.0*f->ty,&tanhsin,&tanhcos);
+   tanhsinh = sinh(2.0*f->tx);
+   tanhcosh = cosh(2.0*f->tx);
+   tanhden = 1.0/(tanhcos + tanhcosh);
+   f->p0 += weight * tanhden * tanhsinh;
+   f->p1 += weight * tanhden * tanhsin;
+}
+
+void var93_sech (flam3_iter_helper *f, double weight) {
+   //Hyperbolic Secant SECH
+   double sechsin,sechcos,sechsinh,sechcosh;
+   double sechden;
+   sincos(f->ty,&sechsin,&sechcos);
+   sechsinh = sinh(f->tx);
+   sechcosh = cosh(f->tx);
+   sechden = 2.0/(cos(2.0*f->ty) + cosh(2.0*f->tx));
+   f->p0 += weight * sechden * sechcos * sechcosh;
+   f->p1 -= weight * sechden * sechsin * sechsinh;
+}
+
+void var94_csch (flam3_iter_helper *f, double weight) {
+   //Hyperbolic Cosecant CSCH
+   double cschsin,cschcos,cschsinh,cschcosh;
+   double cschden;
+   sincos(f->ty,&cschsin,&cschcos);
+   cschsinh = sinh(f->tx);
+   cschcosh = cosh(f->tx);
+   cschden = 2.0/(cosh(2.0*f->tx) - cos(2.0*f->ty));
+   f->p0 += weight * cschden * cschsinh * cschcos;
+   f->p1 -= weight * cschden * cschcosh * cschsin;
+}
+
+void var95_coth (flam3_iter_helper *f, double weight) {
+   //Hyperbolic Cotangent COTH
+   double cothsin,cothcos,cothsinh,cothcosh;
+   double cothden;
+   sincos(2.0*f->ty,&cothsin,&cothcos);
+   cothsinh = sinh(2.0*f->tx);
+   cothcosh = cosh(2.0*f->tx);
+   cothden = 1.0/(cothcosh - cothcos);
+   f->p0 += weight * cothden * cothsinh;
+   f->p1 += weight * cothden * cothsin;
+}
+
 /* Precalc functions */
 
 void perspective_precalc(flam3_xform *xf) {
@@ -1896,6 +2065,8 @@ int prepare_xform_fn_ptrs(flam3_genome *cp, randctx *rc) {
             } else if (j==VAR_WEDGE_SPH) {
                cp->xform[i].precalc_atan_yx_flag=1;
             } else if (j==VAR_WHORL) {
+               cp->xform[i].precalc_atan_yx_flag=1;
+            } else if (j==VAR_LOG) {
                cp->xform[i].precalc_atan_yx_flag=1;
             }
             
@@ -2131,6 +2302,34 @@ int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *rc)
                 var80_whorl(&f, weight); break;
          case (VAR_WAVES2):
                 var81_waves2(&f, weight); break;
+         case (VAR_EXP):
+                var82_exp(&f, weight); break;
+         case (VAR_LOG):
+                var83_log(&f, weight); break;
+         case (VAR_SIN):
+                var84_sin(&f, weight); break;
+         case (VAR_COS):
+                var85_cos(&f, weight); break;
+         case (VAR_TAN):
+                var86_tan(&f, weight); break;
+         case (VAR_SEC):
+                var87_sec(&f, weight); break;
+         case (VAR_CSC):
+                var88_csc(&f, weight); break;
+         case (VAR_COT):
+                var89_cot(&f, weight); break;
+         case (VAR_SINH):
+                var90_sinh(&f, weight); break;
+         case (VAR_COSH):
+                var91_cosh(&f, weight); break;
+         case (VAR_TANH):
+                var92_tanh(&f, weight); break;
+         case (VAR_SECH):
+                var93_sech(&f, weight); break;
+         case (VAR_CSCH):
+                var94_csch(&f, weight); break;
+         case (VAR_COTH):
+                var95_coth(&f, weight); break;
       }
 
    }

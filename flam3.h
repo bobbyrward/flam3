@@ -59,7 +59,7 @@ int flam3_get_palette(int palette_index, flam3_palette p, double hue_rotation);
 
 extern char *flam3_variation_names[];
 
-#define flam3_nvariations 82
+#define flam3_nvariations 96
 #define flam3_nxforms     12
 
 #define flam3_parent_fn_len     30
@@ -162,7 +162,20 @@ extern char *flam3_variation_names[];
 #define VAR_WEDGE_SPH 79
 #define VAR_WHORL 80
 #define VAR_WAVES2 81
-
+#define VAR_EXP 82
+#define VAR_LOG 83
+#define VAR_SIN 84
+#define VAR_COS 85
+#define VAR_TAN 86
+#define VAR_SEC 87
+#define VAR_CSC 88
+#define VAR_COT 89
+#define VAR_SINH 90
+#define VAR_COSH 91
+#define VAR_TANH 92
+#define VAR_SECH 93
+#define VAR_CSCH 94
+#define VAR_COTH 95
 
 typedef struct {
 
