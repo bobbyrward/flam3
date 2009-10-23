@@ -204,8 +204,7 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
    char *att_str;
    int num_std_xforms=-1;
    char tmps[2];
-   int i;
-   int ix = 0;
+   int i,j;
    flam3_xform tmpcpy;
    flam3_chaos_entry *xaos=NULL;
    int num_xaos=0;
@@ -215,6 +214,15 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
    flam3_conversion_failed=0;
 
    /* Store this flame element in the current cp */
+   
+   /* Wipe out the current palette, replace with -1 for each element */
+   for (i=0;i<256;i++) {
+      cp->palette[i].color[0] = 0;
+      cp->palette[i].color[1] = 0;
+      cp->palette[i].color[2] = 0;
+      cp->palette[i].color[3] = 0;
+      cp->palette[i].index = -1;
+   }
 
    /* The top level element is a flame element. */
    /* Read the attributes of it and store them. */
@@ -397,7 +405,7 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
 
       /* Is this a color node? */
       if (!xmlStrcmp(chld_node->name, (const xmlChar *)"color")) {
-         double index = -1;
+         int index = -1;
          double r=0.0,g=0.0,b=0.0,a=0.0;
 
          /* Loop through the attributes of the color element */
@@ -415,7 +423,7 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
             a = 255.0;
 
             if (!xmlStrcmp(cur_att->name, (const xmlChar *)"index")) {
-               index = flam3_atof(att_str);
+               index = flam3_atoi(att_str);
             } else if (!xmlStrcmp(cur_att->name, (const xmlChar *)"rgb")) {
                if (sscanf(att_str, "%lf %lf %lf%1s", &r, &g, &b, tmps) != 3) {
                   fprintf(stderr,"error: invalid rgb attribute '%s'\n",att_str);
@@ -443,16 +451,15 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
             xmlFree(att_str);
          }
 
-         if (index >= 0 && index <= 255.0) {
-            cp->palette[ix].color[3] = a / 255.0;
+         if (index >= 0 && index <= 255) {
+            cp->palette[index].color[3] = a / 255.0;
             /* Don't forget to premultiply the palette... */
-            cp->palette[ix].color[0] = cp->palette[ix].color[3] * r / 255.0;
-            cp->palette[ix].color[1] = cp->palette[ix].color[3] * g / 255.0;
-            cp->palette[ix].color[2] = cp->palette[ix].color[3] * b / 255.0;
-            cp->palette[ix].index = index;
-            ix++;
+            cp->palette[index].color[0] = cp->palette[index].color[3] * r / 255.0;
+            cp->palette[index].color[1] = cp->palette[index].color[3] * g / 255.0;
+            cp->palette[index].color[2] = cp->palette[index].color[3] * b / 255.0;
+            cp->palette[index].index = index;
          } else {
-            fprintf(stderr,"Error:  Color element with bad/missing index attribute (%g)\n",index);
+            fprintf(stderr,"Error:  Color element with bad/missing index attribute (%d)\n",index);
             return(1);
          }
       } else if (!xmlStrcmp(chld_node->name, (const xmlChar *)"colors")) {
@@ -721,6 +728,79 @@ int parse_flame_element(xmlNode *flame_node, flam3_genome *loc_current_cp) {
    if (flam3_conversion_failed) {
       fprintf(stderr,"error: parsing a double or int attribute's value.\n");
       return(1);
+   }
+   
+   /* Check for a non-full palette */
+   if (1) {
+   
+      int minix,maxix;
+      int colorli,colorri;
+      int wrapmin,wrapmax;
+      int intl, intr;
+      int str,enr;
+      int k;
+      double prcr;
+      
+      for (i=0; i<256; i++) {
+         if (cp->palette[i].index >= 0) {
+            minix = i;
+            break;
+         }
+      }
+      if (i==256) {
+         fprintf(stderr,"error: no colors specified!\n");
+         return(1);
+      }
+      
+      wrapmin = minix + 256;
+      
+      for (i=255;i>=0;i--) {
+         if (cp->palette[i].index >= 0) {
+            maxix = i;
+            break;
+         }
+      }
+      
+      wrapmax = maxix - 256;
+      
+      /* Loop over the indices looking for negs */
+      i = 0;
+      while(i<256) {
+   
+         if (cp->palette[i].index < 0) {
+            /* Start of a range of negs */
+            str = i;
+            intl = i-1;
+            colorli = intl;
+            while (cp->palette[i].index<0 && i<256) {
+                enr = i;
+                intr = i+1;
+                colorri = intr;
+                i++;
+            }
+            
+            if (intl==-1) {
+               intl = wrapmax;
+               colorli = maxix;
+            }
+            
+            if (intr==256) {
+               intr = wrapmin;
+               colorri = minix;
+            }
+               
+            for (j=str;j<=enr;j++) {
+            
+               prcr = (j-intl)/(double)(intr-intl);
+               
+               for (k=0;k<=3;k++)
+                  cp->palette[j].color[k] = cp->palette[colorli].color[k] * (1.0-prcr) + cp->palette[colorri].color[k] * prcr;
+            }
+            
+            i = colorri+1;
+         } else
+            i ++;
+      }
    }
    
    return(0);

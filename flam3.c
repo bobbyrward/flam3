@@ -1715,7 +1715,7 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
          else
             fprintf(f, "   <color index=\"%d\" rgba=\"%.6g %.6g %.6g %.6g\"/>", i, r, g, b, a);
       }
-      if (i%4 == 3)
+//      if (i%4 == 3)
          fprintf(f, "\n");
          
    }
