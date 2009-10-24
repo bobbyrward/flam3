@@ -150,10 +150,8 @@ int flam3_interp_missing_colors(flam3_genome *cp) {
         }
     }
     
-    if (i==256) {
-        fprintf(stderr,"error: no colors specified!\n");
+    if (i==256)
         return(1);
-    }
     
     wrapmin = minix + 256;
       
