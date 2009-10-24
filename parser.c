@@ -150,8 +150,12 @@ int flam3_interp_missing_colors(flam3_genome *cp) {
         }
     }
     
-    if (i==256)
+    if (i==256) {
+        /* No colors.  Set all indices properly. */
+        for (i=0;i<256;i++)
+            cp->palette[i].index = i;            
         return(1);
+    }
     
     wrapmin = minix + 256;
       
@@ -196,6 +200,8 @@ int flam3_interp_missing_colors(flam3_genome *cp) {
                 
                 for (k=0;k<=3;k++)
                     cp->palette[j].color[k] = cp->palette[colorli].color[k] * (1.0-prcr) + cp->palette[colorri].color[k] * prcr;
+                    
+                cp->palette[j].index = j;
             }
 
             i = colorri+1;
