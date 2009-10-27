@@ -129,6 +129,7 @@ char *flam3_variation_names[1+flam3_nvariations] = {
   "sech",
   "csch",
   "coth",
+  "flip",
   0
 };
 
@@ -1893,6 +1894,13 @@ void var95_coth (flam3_iter_helper *f, double weight) {
    f->p1 += weight * cothden * cothsin;
 }
 
+void var96_flip (flam3_iter_helper *f, double weight) {
+    // Special FLIP xform to provide identity for flipped xforms    
+    f->p0 -= weight * f->tx;
+    f->p1 += weight * f->ty;
+}
+
+
 /* Precalc functions */
 
 void perspective_precalc(flam3_xform *xf) {
@@ -2330,6 +2338,8 @@ int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *rc)
                 var94_csch(&f, weight); break;
          case (VAR_COTH):
                 var95_coth(&f, weight); break;
+         case (VAR_FLIP):
+                var96_flip(&f, weight); break;
       }
 
    }
