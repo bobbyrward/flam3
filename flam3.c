@@ -1692,7 +1692,7 @@ void flam3_print(FILE *f, flam3_genome *cp, char *extra_attributes, int print_ed
       b = (cp->palette[i].color[2] * 255.0);
       a = (cp->palette[i].color[3] * 255.0);
       
-      if (i%4 == 0)
+//      if (i%4 == 0)
          fprintf(f, "   ");
       
       if (flam27_flag || a==255.0) {
