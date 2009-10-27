@@ -129,7 +129,6 @@ char *flam3_variation_names[1+flam3_nvariations] = {
   "sech",
   "csch",
   "coth",
-  "flip",
   0
 };
 
@@ -1893,13 +1892,6 @@ void var95_coth (flam3_iter_helper *f, double weight) {
    f->p0 += weight * cothden * cothsinh;
    f->p1 += weight * cothden * cothsin;
 }
-
-void var96_flip (flam3_iter_helper *f, double weight) {
-    // Special FLIP xform to provide identity for flipped xforms    
-    f->p0 -= weight * f->tx;
-    f->p1 += weight * f->ty;
-}
-
 
 /* Precalc functions */
 

@@ -59,7 +59,7 @@ int flam3_get_palette(int palette_index, flam3_palette p, double hue_rotation);
 
 extern char *flam3_variation_names[];
 
-#define flam3_nvariations 97
+#define flam3_nvariations 96
 #define flam3_nxforms     12
 
 #define flam3_parent_fn_len     30
@@ -176,7 +176,6 @@ extern char *flam3_variation_names[];
 #define VAR_SECH 93
 #define VAR_CSCH 94
 #define VAR_COTH 95
-#define VAR_FLIP 96
 
 typedef struct {
 
