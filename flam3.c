@@ -644,6 +644,10 @@ void apply_motion_parameters(flam3_xform *xf, flam3_xform *addto, double blend) 
       APPMOT(waves2_scaley);
       APPMOT(waves2_freqx);
       APPMOT(waves2_freqy);
+      APPMOT(auger_sym);
+      APPMOT(auger_weight);
+      APPMOT(auger_freq);
+      APPMOT(auger_scale);
 
       for (j = 0; j < flam3_nvariations; j++)
          APPMOT(var[j]);
@@ -926,6 +930,12 @@ void flam3_copy_params(flam3_xform *dest, flam3_xform *src, int varn) {
       dest->waves2_scaley = src->waves2_scaley;
       dest->waves2_freqx = src->waves2_freqx;
       dest->waves2_freqy = src->waves2_freqy;
+   } else if (varn==VAR_AUGER) {
+      /* auger */
+      dest->auger_sym = src->auger_sym;
+      dest->auger_weight = src->auger_weight;
+      dest->auger_freq = src->auger_freq;
+      dest->auger_scale = src->auger_scale;
    }
 }
 
@@ -1761,7 +1771,7 @@ void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, doub
    int cell_var=0,cpow_var=0,curve_var=0,escher_var=0,lazys_var=0;
    int modulus_var=0,oscope_var=0,popcorn2_var=0,separation_var=0;
    int split_var=0,splits_var=0,stripes_var=0,wedge_var=0,wedgeJ_var=0;
-   int wedgeS_var=0,whorl_var=0,waves2_var=0;
+   int wedgeS_var=0,whorl_var=0,waves2_var=0,auger_var=0;
    
    int j;
    int lnv;
@@ -1874,6 +1884,8 @@ void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, doub
             whorl_var=1;
          else if (j==VAR_WAVES2)
             waves2_var=1;
+         else if (j==VAR_AUGER)
+            auger_var=1;
       }
    }
 
@@ -2082,6 +2094,13 @@ void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, doub
          fprintf(f, "waves2_freqy=\"%g\" ", x->waves2_freqy);
       }
 
+      if (auger_var==1) {
+         fprintf(f, "auger_sym=\"%g\" ", x->auger_sym);
+         fprintf(f, "auger_weight=\"%g\" ", x->auger_weight);
+         fprintf(f, "auger_freq=\"%g\" ", x->auger_freq);
+         fprintf(f, "auger_scale=\"%g\" ", x->auger_scale);
+      }
+
       fprintf(f, "coefs=\"");
       for (j = 0; j < 3; j++) {
          if (j) fprintf(f, " ");
@@ -2232,6 +2251,11 @@ void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, doub
       PRINTNON(waves2_scaley);
       PRINTNON(waves2_freqx);
       PRINTNON(waves2_freqy);
+
+      PRINTNON(auger_sym);
+      PRINTNON(auger_weight);
+      PRINTNON(auger_freq);
+      PRINTNON(auger_scale);
       
       if (!zero_matrix(x->c)) {
          fprintf(f, "coefs=\"");
@@ -3279,6 +3303,14 @@ void flam3_random(flam3_genome *cp, int *ivars, int ivars_n, int sym, int spec_x
          cp->xform[i].waves2_scaley = 0.5 + flam3_random01();
          cp->xform[i].waves2_freqx = 4 * flam3_random01();
          cp->xform[i].waves2_freqy = 4 * flam3_random01();
+      }         
+
+      if (cp->xform[i].var[VAR_AUGER] > 0) {
+         /* Create random params for auger */
+         cp->xform[i].auger_sym = 0;
+         cp->xform[i].auger_weight = 0.5 + flam3_random01()/2.0;
+         cp->xform[i].auger_freq = floor(5*flam3_random01())+1;
+         cp->xform[i].auger_scale = flam3_random01();
       }         
 
    }

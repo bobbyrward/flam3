@@ -129,6 +129,7 @@ char *flam3_variation_names[1+flam3_nvariations] = {
   "sech",
   "csch",
   "coth",
+  "auger",
   0
 };
 
@@ -1893,6 +1894,18 @@ void var95_coth (flam3_iter_helper *f, double weight) {
    f->p1 += weight * cothden * cothsin;
 }
 
+void var96_auger (flam3_iter_helper *f, double weight) {
+
+    // Auger, by Xyrus01
+    double s = sin(f->xform->auger_freq * f->tx);
+    double t = sin(f->xform->auger_freq * f->ty);
+    double dy = f->ty + f->xform->auger_weight*(f->xform->auger_scale*s/2.0 + fabs(f->ty)*s);
+    double dx = f->tx + f->xform->auger_weight*(f->xform->auger_scale*t/2.0 + fabs(f->tx)*t);
+
+    f->p0 += weight * (f->tx + f->xform->auger_sym*(dx-f->tx));
+    f->p1 += weight * dy;
+}
+
 /* Precalc functions */
 
 void perspective_precalc(flam3_xform *xf) {
@@ -2330,6 +2343,8 @@ int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *rc)
                 var94_csch(&f, weight); break;
          case (VAR_COTH):
                 var95_coth(&f, weight); break;
+         case (VAR_AUGER):
+                var96_auger(&f, weight); break;
       }
 
    }
@@ -2465,7 +2480,12 @@ void initialize_xforms(flam3_genome *thiscp, int start_here) {
       thiscp->xform[i].waves2_scalex = 0.0;       
       thiscp->xform[i].waves2_scaley = 0.0;       
       thiscp->xform[i].waves2_freqx = 0.0;       
-      thiscp->xform[i].waves2_freqy = 0.0;       
+      thiscp->xform[i].waves2_freqy = 0.0;  
+      
+      thiscp->xform[i].auger_freq = 1.0;
+      thiscp->xform[i].auger_weight = 0.5;
+      thiscp->xform[i].auger_sym = 0.0;
+      thiscp->xform[i].auger_scale = 1.0;     
        
       thiscp->xform[i].julian_power = 1.0;
       thiscp->xform[i].julian_dist = 1.0;
