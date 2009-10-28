@@ -266,6 +266,21 @@ int flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int
    int outi;
    int xx,yy,dd;
    
+   outi=0;
+   
+   if (cp->xform[xi].density == 0) {
+       for (xx=-numvals;xx<=numvals;xx++) {
+          for (yy=-numvals;yy<=numvals;yy++) {
+          
+             result[outi] = 0;
+             result[outi+1] = 0;
+             
+             outi += 2;
+          }
+       }
+       return(1);
+   }
+   
    /* Prepare the function pointers */
    if (prepare_xform_fn_ptrs(cp,rc))
       return(1);
@@ -275,8 +290,6 @@ int flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int
    
    /* Perform precalculations */
    xform_precalc(cp,xi);
-   
-   outi=0;
    
    /* Loop over the grid */
    for (xx=-numvals;xx<=numvals;xx++) {
