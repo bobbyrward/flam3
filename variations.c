@@ -2330,8 +2330,6 @@ int apply_xform(flam3_genome *cp, int fn, double *p, double *q, randctx *rc)
                 var94_csch(&f, weight); break;
          case (VAR_COTH):
                 var95_coth(&f, weight); break;
-         case (VAR_FLIP):
-                var96_flip(&f, weight); break;
       }
 
    }
