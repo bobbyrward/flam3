@@ -2294,11 +2294,13 @@ void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, doub
          fprintf(f, "\"");
       }
       
-      if (x->opacity<1.0)
-         fprintf(f, " opacity=\"%g\"",x->opacity);
                
    }
-   
+
+   if (!flam27_flag && !motion_flag) {
+      fprintf(f, " opacity=\"%g\"",x->opacity);
+   }
+
    if (!motion_flag && x->num_motion>0 && !flam27_flag) {
       int nm;
       
