@@ -1450,7 +1450,10 @@ flam3_genome *flam3_parse_xml2(char *xmldata, char *xmlfilename, int default_fla
       }
    }
    
-   xmlCleanupParser();
+   //Note that concurrent calls to flam3, if in parallel, potentially segfault
+   //if this function is called.  technically it's required but it doesn't
+   //leak memory continuously.
+   //xmlCleanupParser();
    
    return loc_all_cp;
 }
