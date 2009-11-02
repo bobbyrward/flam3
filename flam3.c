@@ -268,25 +268,18 @@ int flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int
    double incr;
    int outi;
    int xx,yy,dd;
+   double oldweight;
    
    outi=0;
    
-   if (cp->xform[xi].density == 0) {
-       for (xx=-numvals;xx<=numvals;xx++) {
-          for (yy=-numvals;yy<=numvals;yy++) {
-          
-             result[outi] = 0;
-             result[outi+1] = 0;
-             
-             outi += 2;
-          }
-       }
-       return(1);
-   }
+   oldweight = cp->xform[xi].density;
+   cp->xform[xi].density = 1.0;
    
    /* Prepare the function pointers */
-   if (prepare_xform_fn_ptrs(cp,rc))
+   if (prepare_xform_fn_ptrs(cp,rc)) {
+      cp->xform[xi].density = oldweight;
       return(1);
+   }
    
    /* Calculate increment */
    incr = range / (double)numvals;
@@ -312,6 +305,8 @@ int flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int
          outi += 2;
       }
    }
+   cp->xform[xi].density = oldweight;
+
    return(0);
 }         
 
