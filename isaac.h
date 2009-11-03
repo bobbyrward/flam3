@@ -16,6 +16,15 @@ MODIFIED:
 #ifndef _ISAAC_H_
 #define _ISAAC_H_
 
+#if !defined(EXPORT)
+#if defined(_MSC_VER)/* VC++ */
+#include <windows.h>
+#define EXPORT __declspec (dllexport)
+#else
+#define EXPORT
+#endif
+#endif
+
 #define RANDSIZL   (4)  /* I recommend 8 for crypto, 4 for simulations */
 #define RANDSIZ    (1<<RANDSIZL)
 
@@ -38,7 +47,7 @@ typedef  struct randctx  randctx;
 */
 void irandinit( randctx *r, word flag );
 
-void isaac( randctx *r );
+EXPORT void isaac( randctx *r );
 
 
 /*

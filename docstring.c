@@ -196,7 +196,7 @@ static char *the_docstring1 =
 "The complete list of variations:\n"
 ;
 
-void docstring() {
+EXPORT docstring() {
     int i;
     fputs(the_docstring0, stdout);
     fputs(flam3_version(), stdout);

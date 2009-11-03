@@ -311,7 +311,7 @@ int main(int argc, char **argv) {
 
       for (strip = 0; strip < nstrips; strip++) {
          size_t ssoff = (size_t)cps[i].height * strip * cps[i].width * channels * f.bytes_per_channel;
-         void *strip_start = image + ssoff;
+         void *strip_start = (unsigned char*)image + ssoff;
          cps[i].center[1] = center_base + cps[i].height * (double) strip / (cps[i].pixels_per_unit * zoom_scale);
          
          if ((cps[i].height * (strip + 1)) > real_height) {

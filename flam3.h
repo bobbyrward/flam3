@@ -22,7 +22,6 @@
 
 #include <stdio.h>
 #include <libxml/parser.h>
-#include "isaac.h"
 
 #if defined(_MSC_VER) /* VC++ */
 #include <windows.h>
@@ -30,6 +29,8 @@
 #else
 #define EXPORT
 #endif
+
+#include "isaac.h"
 
 EXPORT char *flam3_version();
 
@@ -52,7 +53,7 @@ typedef struct {
 
 typedef flam3_palette_entry flam3_palette[256];
 
-int flam3_get_palette(int palette_index, flam3_palette p, double hue_rotation);
+EXPORT int flam3_get_palette(int palette_index, flam3_palette p, double hue_rotation);
 
 #define flam3_variation_random (-1)
 #define flam3_variation_random_fromspecified (-2)
@@ -518,20 +519,20 @@ typedef struct {
 
 /* xform manipulation */
 
-void flam3_add_motion_element(flam3_xform *xf);
-void flam3_add_xforms(flam3_genome *cp, int num_to_add, int interp_padding, int final_flag);
-void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete);
-void flam3_copy_xform(flam3_xform *dest, flam3_xform *src);
-void flam3_copy(flam3_genome *dest, flam3_genome *src);
-void flam3_copyx(flam3_genome *dest, flam3_genome *src, int num_std, int num_final);
-void flam3_copy_params(flam3_xform *dest, flam3_xform *src, int varn);
-void flam3_delete_motion_elements(flam3_xform *xf);
+EXPORT void flam3_add_motion_element(flam3_xform *xf);
+EXPORT void flam3_add_xforms(flam3_genome *cp, int num_to_add, int interp_padding, int final_flag);
+EXPORT void flam3_delete_xform(flam3_genome *thiscp, int idx_to_delete);
+EXPORT void flam3_copy_xform(flam3_xform *dest, flam3_xform *src);
+EXPORT void flam3_copy(flam3_genome *dest, flam3_genome *src);
+EXPORT void flam3_copyx(flam3_genome *dest, flam3_genome *src, int num_std, int num_final);
+EXPORT void flam3_copy_params(flam3_xform *dest, flam3_xform *src, int varn);
+EXPORT void flam3_delete_motion_elements(flam3_xform *xf);
 
 EXPORT int flam3_xform_preview(flam3_genome *cp, int xi, double range, int numvals, int depth, double *result, randctx *rc);
 EXPORT unsigned short* flam3_create_xform_distrib(flam3_genome *cp);
-int flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_distrib);
-int flam3_check_unity_chaos(flam3_genome *cp);
-void clear_cp(flam3_genome *cp, int def_flag);
+EXPORT int flam3_create_chaos_distrib(flam3_genome *cp, int xi, unsigned short *xform_distrib);
+EXPORT int flam3_check_unity_chaos(flam3_genome *cp);
+EXPORT void clear_cp(flam3_genome *cp, int def_flag);
 
 /* samples is array nsamples*4 long of x,y,color triples.
    using (samples[0], samples[1]) as starting XY point and
@@ -548,9 +549,9 @@ void apply_motion_parameters(flam3_xform *xf, flam3_xform *addto, double blend);
 EXPORT void flam3_interpolate(flam3_genome *genomes, int ngenomes, double time, double stagger, flam3_genome *result);
 
 /* print genome to given file with extra_attributes if not NULL */
-void flam3_print(FILE *f, flam3_genome *g, char *extra_attributes, int print_edits);
-void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, double *chaos_row, int motion_flag);
-char *flam3_print_to_string(flam3_genome *cp);
+EXPORT void flam3_print(FILE *f, flam3_genome *g, char *extra_attributes, int print_edits);
+EXPORT void flam3_print_xform(FILE *f, flam3_xform *x, int final_flag, int numstd, double *chaos_row, int motion_flag);
+EXPORT char *flam3_print_to_string(flam3_genome *cp);
 
 /* ivars is a list of variations to use, or flam3_variation_random     */
 /* ivars_n is the number of values in ivars to select from.            */
@@ -558,27 +559,27 @@ char *flam3_print_to_string(flam3_genome *cp);
 /* spec_xforms specifies the number of xforms to use, setting to 0 makes the number random. */
 EXPORT void flam3_random(flam3_genome *g, int *ivars, int ivars_n, int sym, int spec_xforms);
 
-void add_to_action(char *action, char *addtoaction);
+EXPORT void add_to_action(char *action, char *addtoaction);
 
 EXPORT void flam3_mutate(flam3_genome *cp, int mutate_mode, int *ivars, int ivars_n, int sym, double speed, randctx *rc, char *action);
 EXPORT void flam3_cross(flam3_genome *cp0, flam3_genome *cp1, flam3_genome *out, int cross_mode, randctx *rc, char *action);
 
 /* return NULL in case of error */
 EXPORT flam3_genome *flam3_parse_xml2(char *s, char *fn, int default_flag, int *ncps);
-flam3_genome *flam3_parse_from_file(FILE *f, char *fn, int default_flag, int *ncps);
+EXPORT flam3_genome *flam3_parse_from_file(FILE *f, char *fn, int default_flag, int *ncps);
 
-void flam3_add_symmetry(flam3_genome *g, int sym);
+EXPORT void flam3_add_symmetry(flam3_genome *g, int sym);
 
-void flam3_improve_colors(flam3_genome *g, int ntries, int change_palette, int color_resolution);
+EXPORT void flam3_improve_colors(flam3_genome *g, int ntries, int change_palette, int color_resolution);
 EXPORT int flam3_colorhist(flam3_genome *cp, int num_batches, double *hist);
 EXPORT int flam3_estimate_bounding_box(flam3_genome *g, double eps, int nsamples,
              double *bmin, double *bmax, randctx *rc);
-void flam3_rotate(flam3_genome *g, double angle, int interp_type); /* angle in degrees */
+EXPORT void flam3_rotate(flam3_genome *g, double angle, int interp_type); /* angle in degrees */
 
-double flam3_dimension(flam3_genome *g, int ntries, int clip_to_camera);
-double flam3_lyapunov(flam3_genome *g, int ntries);
+EXPORT double flam3_dimension(flam3_genome *g, int ntries, int clip_to_camera);
+EXPORT double flam3_lyapunov(flam3_genome *g, int ntries);
 
-void flam3_apply_template(flam3_genome *cp, flam3_genome *templ);
+EXPORT void flam3_apply_template(flam3_genome *cp, flam3_genome *templ);
 
 EXPORT int flam3_count_nthreads(void);
 
@@ -610,14 +611,14 @@ EXPORT int flam3_render(flam3_frame *f, void *out, int field, int nchan, int tra
 EXPORT double flam3_render_memory_required(flam3_frame *f);
 
 
-double flam3_random01();
-double flam3_random11();
-int flam3_random_bit();
+EXPORT double flam3_random01();
+EXPORT double flam3_random11();
+EXPORT int flam3_random_bit();
 
 /* ISAAC random numbers */
-double flam3_random_isaac_01(randctx *);
-double flam3_random_isaac_11(randctx *);
-int flam3_random_isaac_bit(randctx *);
+EXPORT double flam3_random_isaac_01(randctx *);
+EXPORT double flam3_random_isaac_11(randctx *);
+EXPORT int flam3_random_isaac_bit(randctx *);
 
 EXPORT void flam3_init_frame(flam3_frame *f);
 
@@ -625,10 +626,11 @@ EXPORT void flam3_init_frame(flam3_frame *f);
 EXPORT void *flam3_malloc(size_t size);
 EXPORT void flam3_free(void *ptr);
 
-void flam3_srandom();
+EXPORT void flam3_srandom();
 
-flam3_genome *sheep_loop(flam3_genome *cp, double blend);
-flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag, double stagger);
+EXPORT flam3_genome *sheep_loop(flam3_genome *cp, double blend);
+EXPORT flam3_genome *sheep_edge(flam3_genome *cp, double blend, int seqflag, double stagger);
+
 
 /* Motion function indices */
 #define MOTION_SIN 1
